@@ -313,9 +313,9 @@ export default defineComponent({
 <template>
   <div class="vcluster-oss-plugin">
     <!-- Simple clusters table -->
-    <div class="mt-20">
-      <h2 class="mb-10">vClusters List</h2>
-      <div class="mt-20 mb-10">
+    <div class="clusters-table-container">
+      <h2 class="clusters-title">vClusters List</h2>
+      <div class="create-button-container">
         <button class="btn role-primary" @click="openCreateDialog">
           Create vCluster
         </button>
@@ -361,40 +361,25 @@ export default defineComponent({
   padding: 20px;
 }
 
+.clusters-table-container {
+  margin-top: 20px;
+}
+
+.clusters-title {
+  margin-bottom: 10px;
+}
+
+.create-button-container {
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
 .block {
   display: block;
 }
 
 .cluster-selector {
   padding: 20px;
-}
-
-.mb-5 {
-  margin-bottom: 5px;
-}
-
-.mb-10 {
-  margin-bottom: 10px;
-}
-
-.mb-20 {
-  margin-bottom: 20px;
-}
-
-.mt-10 {
-  margin-top: 10px;
-}
-
-.mt-20 {
-  margin-top: 20px;
-}
-
-.mr-5 {
-  margin-right: 5px;
-}
-
-.ml-10 {
-  margin-left: 10px;
 }
 
 .text-muted {

@@ -87,13 +87,13 @@ export default defineComponent({
     :trigger-focus-trap="true"
     @close="closeModal(false)"
   >
-    <div class="modal-dialog">
-      <h4>Create vCluster</h4>
+    <div class="modal-content">
+      <h4 class="modal-title">Create vCluster</h4>
 
-      <div class="mt-20">
-        <div class="row mb-10">
-          <div class="col span-12">
-            <label class="mb-10 block">Select a Cluster:</label>
+      <div class="form-container">
+        <div class="form-group">
+          <div class="form-field">
+            <label class="form-label">Select a Cluster:</label>
             <Select
               :options="clusterOptions"
               :value="selectedClusterId"
@@ -103,7 +103,7 @@ export default defineComponent({
               @update:value="onClusterSelected"
             >
               <template #option="option">
-                <div class="select-option">
+                <div class="option-content">
                   <span>{{ option.label }}</span>
                   <span v-if="option.disabled" class="text-muted"
                     >(Not ready)</span
@@ -114,9 +114,9 @@ export default defineComponent({
           </div>
         </div>
 
-        <div class="row mb-10">
-          <div class="col span-12">
-            <label class="mb-10 block">vCluster Version:</label>
+        <div class="form-group">
+          <div class="form-field">
+            <label class="form-label">vCluster Version:</label>
             <Select
               :options="versionOptions"
               :value="selectedVersion"
@@ -126,26 +126,26 @@ export default defineComponent({
               @update:value="onVersionSelected"
             >
               <template #option="option">
-                <div class="select-option">
+                <div class="option-content">
                   <span>{{ option.label }}</span>
                 </div>
               </template>
             </Select>
-            <div v-if="loadingRepos" class="mt-5 text-muted">
+            <div v-if="loadingRepos" class="loading-message">
               Loading versions...
             </div>
           </div>
         </div>
       </div>
 
-      <div class="dialog-buttons mt-20">
+      <div class="modal-actions">
         <button class="btn role-secondary" @click="closeModal(false)">
           Cancel
         </button>
         <AsyncButton
           :disabled="!selectedClusterId || !selectedVersion"
           mode="create"
-          class="ml-10"
+          class="btn-primary"
           @click="handleCreate"
         />
       </div>
@@ -154,36 +154,36 @@ export default defineComponent({
 </template>
 
 <style lang="css" scoped>
-.modal-dialog {
+.modal-content {
   padding: 10px;
 }
 
-.modal-dialog h4 {
+.modal-title {
   font-weight: bold;
+  margin-bottom: 0;
 }
 
-.block {
-  display: block;
-}
-
-.mb-5 {
-  margin-bottom: 5px;
-}
-
-.mb-10 {
-  margin-bottom: 10px;
-}
-
-.mt-5 {
-  margin-top: 5px;
-}
-
-.mt-20 {
+.form-container {
   margin-top: 20px;
 }
 
-.ml-10 {
-  margin-left: 10px;
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-field {
+  width: 100%;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.loading-message {
+  margin-top: 5px;
+  color: var(--muted);
+  font-style: italic;
 }
 
 .text-muted {
@@ -192,19 +192,19 @@ export default defineComponent({
   margin-left: 5px;
 }
 
-.select-option {
+.option-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.dialog-buttons {
+.modal-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: 20px;
 }
 
-.dialog-buttons > *:not(:last-child) {
-  margin-right: 10px;
+.btn-primary {
+  margin-left: 10px;
 }
 </style>

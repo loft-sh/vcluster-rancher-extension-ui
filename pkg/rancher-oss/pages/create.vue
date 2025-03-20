@@ -6,6 +6,7 @@ import LabeledInput from '@shell/rancher-components/Form/LabeledInput/LabeledInp
 import NameNsDescription from '@shell/components/form/NameNsDescription.vue';
 import YamlEditor from '@shell/components/YamlEditor.vue';
 import AsyncButton, { AsyncButtonCallback } from '@shell/components/AsyncButton.vue';
+import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 
 
 
@@ -39,7 +40,8 @@ export default defineComponent({
     LabeledInput: LabeledInput as any,
     NameNsDescription: NameNsDescription as any,
     YamlEditor: YamlEditor as any,
-    AsyncButton: AsyncButton as any
+    AsyncButton: AsyncButton as any,
+    LabeledSelect: LabeledSelect as any
   },
 
   computed: {
@@ -48,6 +50,17 @@ export default defineComponent({
       const namespaceObjs = this.namespaces();
       return namespaceObjs
     },
+    projectOpts() {
+    const clusterId = this.$route.params.cluster;
+    const projects = this.$store.getters['management/all']('management.cattle.io.project')
+
+    return projects
+      .filter((project: any) => project.spec.clusterName === clusterId)
+      .map((project: any) => ({
+        label: project.spec.displayName || project.metadata.name,
+        value: project.metadata.name
+      }));
+  }
   },
 
   data() {
@@ -63,6 +76,8 @@ export default defineComponent({
           namespace: ''
         }
       },
+      isNewNamespace: false,
+      selectedProjectId: null,
       yamlValue: `sync:
   toHost:
     ingresses:
@@ -125,6 +140,15 @@ export default defineComponent({
       }
     },
 
+    onNamespaceChange(isNew: boolean) {
+    this.isNewNamespace = isNew;
+
+    // Reset selected project when namespace changes
+    if (!isNew) {
+      this.selectedProjectId = null;
+    }
+  },
+
     onYamlChange(value: string) {
       this.yamlValue = value;
     },
@@ -142,7 +166,27 @@ export default defineComponent({
       const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
       const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace)
 
-      const projectId = namespaceObject.metadata.labels["field.cattle.io/projectId"]
+// Get project ID - handle both existing and new namespaces
+let projectId;
+
+  if (this.isNewNamespace) {
+    // For new namespace, use the selected project from your form
+    projectId = this.selectedProjectId;
+  } else {
+    // For existing namespace, find it from the store
+    const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
+    const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace);
+    projectId = namespaceObject?.metadata?.labels["field.cattle.io/projectId"];
+  }
+
+  if (!projectId) {
+    cb(false);
+    this.$store.dispatch('growl/error', {
+      title: 'Error',
+      message: 'Project ID is required to create vCluster'
+    });
+    return;
+  }
 
       let values = {};
       try {
@@ -219,30 +263,45 @@ export default defineComponent({
 
 <template>
   <div class="vcluster-create-page">
-    <div class="header">
+    <div class="vcluster-header">
       <h1>vCluster Chart Information</h1>
     </div>
 
-    <Loading v-if="loading" class="loading" />
+    <Loading v-if="loading" class="vcluster-loading" />
 
-    <div v-else class="chart-info">
+    <div v-else class="vcluster-chart-info">
       <NameNsDescription
         v-model:value="value"
         :description-hidden="true"
         mode="create"
+        @isNamespaceNew="onNamespaceChange"
       />
 
-      <div class="yaml-section mt-20">
-        <h3>Configuration YAML</h3>
+      <div v-if="isNewNamespace" class="vcluster-project-selector">
+        <LabeledSelect
+          v-model:value="selectedProjectId"
+          :options="projectOpts"
+          label="Project"
+          placeholder="Select a project for this namespace"
+          :searchable="true"
+          :required="true"
+        />
+        <p class="vcluster-help-text">
+          Select the project to which this new namespace will belong
+        </p>
+      </div>
+
+      <div class="vcluster-yaml-section">
+        <h3 class="vcluster-section-title">Configuration YAML</h3>
         <YamlEditor
-          class="yaml-editor"
+          class="vcluster-yaml-editor"
           :value="yamlValue"
           @onInput="onYamlChange"
         />
       </div>
     </div>
 
-    <div class="actions mt-20 flex flex-row gap-10">
+    <div class="vcluster-actions">
       <button class="btn role-secondary" @click="goBack">
         Back to Dashboard
       </button>
@@ -260,75 +319,64 @@ export default defineComponent({
 </template>
 
 <style lang="css" scoped>
-
-.flex {
-  display: flex;
-}
-
-.flex-row {
-  flex-direction: row;
-}
-
-.gap-10 {
-  gap: 10px;
-}
-
 .vcluster-create-page {
   padding: 20px;
 }
 
-.header {
+.vcluster-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
 }
 
-.error-container {
-  background-color: var(--error-bg);
-  border: 1px solid var(--error);
-  border-radius: 4px;
-  padding: 20px;
-  margin: 20px 0;
-}
-
-.error-message {
-  color: var(--error);
-  font-weight: bold;
-}
-
-.chart-info {
+.vcluster-chart-info {
   background-color: var(--box-bg);
   border-radius: 4px;
   padding: 20px;
-}
-
-.info-section {
   margin-bottom: 20px;
 }
 
-.info-section h3 {
-  margin-bottom: 10px;
-  font-weight: bold;
+.vcluster-project-selector {
+  max-width: clamp(300px, 50%, 636px);
 }
 
-.yaml-section h3 {
-  margin-bottom: 10px;
-  font-weight: bold;
+
+.vcluster-help-text {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 5px;
 }
 
-.yaml-editor {
+.vcluster-yaml-section {
+  margin-top: 20px;
+}
+
+.vcluster-section-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.vcluster-yaml-editor {
   height: 300px;
   border: 1px solid var(--border);
   border-radius: 4px;
 }
 
-.mt-20 {
+.vcluster-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
   margin-top: 20px;
 }
 
-.actions {
+.vcluster-loading {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+  padding: 20px;
+}
+
+.vcluster-create-btn {
+  min-width: 120px;
 }
 </style>
