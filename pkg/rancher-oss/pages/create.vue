@@ -51,16 +51,16 @@ export default defineComponent({
       return namespaceObjs
     },
     projectOpts() {
-    const clusterId = this.$route.params.cluster;
-    const projects = this.$store.getters['management/all']('management.cattle.io.project')
+      const clusterId = this.$route.params.cluster;
+      const projects = this.$store.getters['management/all']('management.cattle.io.project')
 
-    return projects
-      .filter((project: any) => project.spec.clusterName === clusterId)
-      .map((project: any) => ({
-        label: project.spec.displayName || project.metadata.name,
-        value: project.metadata.name
-      }));
-  }
+      return projects
+        .filter((project: any) => project.spec.clusterName === clusterId)
+        .map((project: any) => ({
+          label: project.spec.displayName || project.metadata.name,
+          value: project.metadata.name
+        }));
+    }
   },
 
   data() {
@@ -141,13 +141,13 @@ export default defineComponent({
     },
 
     onNamespaceChange(isNew: boolean) {
-    this.isNewNamespace = isNew;
+      this.isNewNamespace = isNew;
 
-    // Reset selected project when namespace changes
-    if (!isNew) {
-      this.selectedProjectId = null;
-    }
-  },
+      // Reset selected project when namespace changes
+      if (!isNew) {
+        this.selectedProjectId = null;
+      }
+    },
 
     onYamlChange(value: string) {
       this.yamlValue = value;
@@ -163,30 +163,28 @@ export default defineComponent({
       const chartName = "vcluster"
       const version = this.$route.query.version
       const inStore = this.$store.getters['currentStore']();
-      const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
-      const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace)
 
-// Get project ID - handle both existing and new namespaces
-let projectId;
+      // Get project ID - handle both existing and new namespaces
+      let projectId;
 
-  if (this.isNewNamespace) {
-    // For new namespace, use the selected project from your form
-    projectId = this.selectedProjectId;
-  } else {
-    // For existing namespace, find it from the store
-    const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
-    const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace);
-    projectId = namespaceObject?.metadata?.labels["field.cattle.io/projectId"];
-  }
+      if (this.isNewNamespace) {
+        // For new namespace, use the selected project from your form
+        projectId = this.selectedProjectId;
+      } else {
+        // For existing namespace, find it from the store
+        const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
+        const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace);
+        projectId = namespaceObject?.metadata?.labels["field.cattle.io/projectId"];
+      }
 
-  if (!projectId) {
-    cb(false);
-    this.$store.dispatch('growl/error', {
-      title: 'Error',
-      message: 'Project ID is required to create vCluster'
-    });
-    return;
-  }
+      if (!projectId) {
+        cb(false);
+        this.$store.dispatch('growl/error', {
+          title: 'Error',
+          message: 'Project ID is required to create vCluster'
+        });
+        return;
+      }
 
       let values = {};
       try {

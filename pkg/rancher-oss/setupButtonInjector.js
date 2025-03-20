@@ -3,9 +3,14 @@ export function setupButtonInjector() {
     const button = document.querySelector(
       '.home-page [data-testid="cluster-create-button"]',
     );
+
     const existingVClusterButton = document.querySelector(
       '[data-testid="vcluster-create-button"]',
     );
+
+    if (existingVClusterButton) {
+      return true;
+    }
 
     if (button && !existingVClusterButton) {
       const copiedButton = button.cloneNode(true);
@@ -38,22 +43,30 @@ export function setupButtonInjector() {
     }
   };
 
-  addVClusterButton();
+  const isButtonAdded = addVClusterButton();
 
+  if (isButtonAdded) {
+    return;
+  }
+
+  const targetNode = document.querySelector(".home-page") || document.body;
   const observer = new MutationObserver((mutations) => {
-    addVClusterButton();
+    // Only check if we need to add the button when relevant changes occur
+    for (const mutation of mutations) {
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        addVClusterButton();
+        break;
+      }
+    }
   });
 
-  observer.observe(document.body, {
+  // More specific configuration
+  observer.observe(targetNode, {
     childList: true,
     subtree: true,
   });
 
-  setInterval(addVClusterButton, 2000);
-
-  if (window.hasOwnProperty("$nuxt") && window.$nuxt && window.$nuxt.$router) {
-    window.$nuxt.$router.afterEach(() => {
-      setTimeout(addVClusterButton, 500);
-    });
-  }
+  return () => {
+    observer.disconnect();
+  };
 }
