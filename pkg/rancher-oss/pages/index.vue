@@ -1,7 +1,7 @@
 <script lang="ts">
 import { defineComponent, PropType } from 'vue';
 import { Store } from 'vuex';
-import { MANAGEMENT } from '@shell/config/types';
+import { CATALOG, MANAGEMENT } from '@shell/config/types';
 import LabelValue from '@shell/components/LabelValue.vue';
 import InfoBox from '@shell/components/InfoBox.vue';
 import ClusterIconMenu from '@shell/components/ClusterIconMenu.vue';
@@ -35,6 +35,16 @@ interface ClusterResource {
   goToCluster?: () => Promise<void>;
 }
 
+interface AppResource {
+  id?: string;
+  status?: any;
+  spec?: any;
+  metadata?: any;
+  clusterId?: string;
+  clusterName?: string;
+  error?: string;
+}
+
 export default defineComponent({
   name: 'vClusterList',
 
@@ -62,6 +72,7 @@ export default defineComponent({
     return {
       originalStyles: new Map<Element, string>(),
       clusters: [] as ClusterResource[],
+      failedInstallations: [] as AppResource[],
       selectedClusterId: '',
       loading: false,
       showCreateDialog: false,
@@ -97,6 +108,28 @@ export default defineComponent({
           width: 280
         }
       ],
+      failedInstallationsTableHeaders: [
+        {
+          name: 'vCluster',
+          label: 'vCluster',
+          value: 'metadata.name'
+        },
+        {
+          name: 'namespace',
+          label: 'Namespace',
+          value: 'metadata.namespace'
+        },
+        {
+          name: 'status',
+          label: 'Status',
+          value: 'error'
+        },
+        {
+          name: 'actions',
+          label: 'Actions',
+          value: 'actions'
+        }
+      ]
     };
   },
 
@@ -111,7 +144,6 @@ export default defineComponent({
         this.loading ||
         (this.selectedCluster && !this.selectedCluster.isReady);
     },
-
 
     clusterOptions(): { label: string; value: string; disabled?: boolean }[] {
       return [
@@ -128,7 +160,6 @@ export default defineComponent({
     },
 
     versionOptions(): { label: string; value: string }[] {
-
       const options = [
         {
           label: '-- Select a Version --',
@@ -139,7 +170,6 @@ export default defineComponent({
       if (Array.isArray(this.repoVersions) && this.repoVersions.length > 0) {
         this.repoVersions.forEach((versObj: any, index: number) => {
           if (versObj && typeof versObj === 'object' && 'version' in versObj) {
-
             const isLatest = index === 0;
             options.push({
               label: versObj.version + (isLatest ? ' (Default)' : ''),
@@ -160,7 +190,6 @@ export default defineComponent({
   created(): void {
     this.loadClusters();
     this.loadRepoVersions();
-
   },
 
   mounted() {
@@ -180,11 +209,106 @@ export default defineComponent({
       this.originalStyles.set(nav, nav.style.display);
       nav.style.display = 'none';
     }
+
+    this.loadFailedInstallations();
   },
 
   methods: {
+    async loadFailedInstallations() {
+      try {
+        this.failedInstallations = await this.fetchFailedVClusterApps();
+      } catch (error) {
+        console.error('Failed to load installation errors:', error);
+        this.failedInstallations = [];
+      }
+    },
+
+    async fetchFailedVClusterApps() {
+      const failedApps = [];
+
+      try {
+        const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER);
+        const readyClusters = mgmtClusters.filter((cluster: ClusterResource) => cluster.isReady);
+
+        for (const cluster of readyClusters) {
+          try {
+            if (!cluster.id) {
+          console.log('Skipping cluster with no ID:', cluster);
+          continue;
+        }
+            const apps = await this.$store.dispatch('management/findAll', {
+              type: CATALOG.APP,
+              opt: {
+                url: `/k8s/clusters/${cluster.id}/v1/catalog.cattle.io.apps`,
+                force: true
+              }
+            });
+
+            console.log('apps', apps);
+
+            const clusterFailedApps = apps.filter((app: AppResource) => {
+              const isLoftApp = app.spec?.chart?.metadata?.annotations?.['catalog.cattle.io/ui-source-repo'] === 'loft';
+
+              const isFailed = app.spec?.info?.status === 'failed';
+              const isPending = app.spec?.info?.status === 'pending';
+
+
+              return isLoftApp && (isFailed || isPending);
+            });
+
+            console.log('clusterFailedApps', clusterFailedApps);
+            console.log('cluster', cluster);
+
+            clusterFailedApps.forEach((app: AppResource) => {
+              app.clusterId = cluster.id;
+              app.clusterName = cluster.spec?.displayName || cluster.metadata?.name;
+              app.error = this.getAppErrorMessage(app);
+
+              // Ensure app has a unique id for the key-field
+              if (!app.id) {
+                app.id = `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`;
+              }
+            });
+
+            failedApps.push(...clusterFailedApps);
+          } catch (error) {
+            console.error(`Error fetching apps for cluster ${cluster.id}:`, error);
+          }
+        }
+
+        console.log('failedApps', failedApps);
+
+        return failedApps;
+      } catch (error) {
+        console.error('Error fetching failed vCluster apps:', error);
+        return [];
+      }
+    },
+
+    getAppErrorMessage(app: AppResource) {
+      // Fix the logic in this method
+      if (app.spec?.info?.status === 'pending') {
+        return 'Installation pending';
+      } else if (app.spec?.info?.status === 'failed') {
+        return 'Installation failed';
+      } else {
+        return 'Installation failed';
+      }
+    },
+
+    navigateToApp(app: AppResource) {
+      this.$router.push({
+        name: 'c-cluster-apps-charts-app',
+        params: {
+          cluster: app.clusterId,
+          appNamespace: app.metadata.namespace,
+          appName: app.metadata.name
+        }
+      });
+    },
+
     getStatusColor(cluster: ClusterResource): string {
-      console.log('cluster', cluster);
+
       if (!cluster) {
         return 'bg-warning';
       }
@@ -195,7 +319,7 @@ export default defineComponent({
         return 'bg-info';
       } else if (cluster.state === 'Failed' || cluster.state === 'Error') {
         return 'bg-error';
-      } else if ( cluster.state === "unavailable") {
+      } else if (cluster.state === "unavailable") {
         return 'bg-neutral';
       } else {
         return 'bg-warning';
@@ -203,8 +327,6 @@ export default defineComponent({
     },
 
     t(key: string): string {
-      // Simple translation function to match home.vue style
-      // Replace with actual translation implementation if available
       const translations: { [key: string]: string } = {
         'tableHeaders.name': 'Name',
         'tableHeaders.state': 'Status',
@@ -240,7 +362,6 @@ export default defineComponent({
               return false;
             }
 
-
             return !version.includes('rc') && !version.includes('beta') && !version.includes('alpha');
           });
 
@@ -256,6 +377,7 @@ export default defineComponent({
         this.loadingRepos = false;
       }
     },
+
     loadClusters(): void {
       const mgmtClusters: ClusterResource[] = this.$store.getters['management/all'](MANAGEMENT.CLUSTER);
       this.clusters = [...mgmtClusters];
@@ -352,7 +474,6 @@ export default defineComponent({
 
 <template>
   <div class="vcluster-oss-plugin">
-    <!-- Clusters table styled like home.vue -->
     <div class="clusters-table-container">
       <div class="row panel">
         <div class="col span-12">
@@ -415,6 +536,43 @@ export default defineComponent({
           </SortableTable>
         </div>
       </div>
+      <div class="row panel">
+        <div
+          v-if="failedInstallations.length > 0"
+          class="failed-installations mt-20"
+        >
+          <h2>Failed vCluster Installations</h2>
+          <table class="simple-table">
+            <thead>
+              <tr>
+                <th>vCluster Name</th>
+                <th>Namespace</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="app in failedInstallations" :key="app.id">
+                <td>{{ app.metadata?.name || 'Unknown' }}</td>
+                <td>{{ app.metadata?.namespace || 'Unknown' }}</td>
+                <td>
+                  <span class="badge-state bg-error">
+                    {{ app.error || 'Unknown error' }}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    class="btn btn-sm role-primary"
+                    @click="navigateToApp(app)"
+                  >
+                    View Details
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <VClusterCreateModal
@@ -448,7 +606,6 @@ export default defineComponent({
   text-transform: capitalize;
 }
 
-/* Component specific */
 .vcluster-oss-plugin {
   width: 100%;
   padding: 20px;
@@ -541,5 +698,24 @@ export default defineComponent({
     text-overflow: ellipsis;
     color: var(--muted);
   }
+}
+
+.simple-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.simple-table th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 2px solid var(--border);
+  font-weight: bold;
+  background-color: var(--header-bg);
+}
+
+.simple-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
 }
 </style>
