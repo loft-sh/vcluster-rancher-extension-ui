@@ -292,9 +292,7 @@ export default defineComponent({
               const isLoftApp = app.spec?.chart?.metadata?.annotations?.['catalog.cattle.io/ui-source-repo'] === 'loft';
 
               const isFailed = app.spec?.info?.status === 'failed';
-              const isPending = app.spec?.info?.status === 'pending';
-
-
+              const isPending = app.metadata?.state?.name === 'pending-install';
               return isLoftApp && (isFailed || isPending);
             });
 
@@ -329,12 +327,12 @@ export default defineComponent({
 
     getAppErrorMessage(app: AppResource) {
       // Fix the logic in this method
-      if (app.spec?.info?.status === 'pending') {
-        return 'Installation pending';
+      if (app.metadata?.state?.name === 'pending-install') {
+        return 'Pending';
       } else if (app.spec?.info?.status === 'failed') {
-        return 'Installation failed';
+        return 'Failed';
       } else {
-        return 'Installation failed';
+        return 'Unknown';
       }
     },
 
@@ -354,10 +352,9 @@ export default defineComponent({
       if (!cluster) {
         return 'bg-warning';
       }
-
       if (cluster.isReady) {
         return 'bg-success';
-      } else if (cluster.status.state === 'Provisioning' || cluster.status.state === 'Updating') {
+      } else if (cluster.status.state === 'Provisioning' || cluster.status.state === 'Updating' || cluster.status.state?.name === 'pending-install') {
         return 'bg-info';
       } else if (cluster.status.state === 'Failed' || cluster.status.state === 'Error') {
         return 'bg-error';
@@ -368,16 +365,7 @@ export default defineComponent({
       }
     },
 
-    t(key: string): string {
-      const translations: { [key: string]: string } = {
-        'tableHeaders.name': 'Name',
-        'tableHeaders.state': 'Status',
-        'tableHeaders.namespace': 'Namespace',
-        'tableHeaders.id': 'ID'
-      };
 
-      return translations[key] || key;
-    },
 
     async loadRepoVersions(): Promise<void> {
       this.loadingRepos = true;
@@ -597,8 +585,8 @@ export default defineComponent({
                 </template>
                 <template v-else>
                   <BadgeState
-                    :color="row.error && row.error.includes('pending') ? 'bg-warning' : 'bg-error'"
-                    :label="row.error || 'Error'"
+                    :color="row.status.state === 'pending-install' ? 'bg-warning' : 'bg-error'"
+                    :label="row.status.state === 'pending-install' ? 'Pending' : 'Failed'"
                   />
                 </template>
               </td>
