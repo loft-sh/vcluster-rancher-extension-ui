@@ -87,13 +87,13 @@ export default defineComponent({
       repoVersions: [] as Array<{ version: string;[key: string]: any }>,
       selectedVersion: '',
       tableHeaders: [
-        {
-          name: 'status',
-          label: 'Status',
-          value: 'state',
-          sort: ['state', 'nameDisplay'],
-          width: 100
-        },
+      {
+    name: 'status',
+    label: 'Status',
+    value: 'state',
+    sort: ['sort'],
+    width: 100
+  },
         {
           name: 'name',
           label: 'Name',
@@ -133,7 +133,7 @@ export default defineComponent({
       state: cluster.metadata?.state?.message || "",
       // For grouping and identification
       type: 'cluster',
-      sort: 1,
+      sort: cluster.isReady ? 1 : 2,
       group: 'active',
       // Keep the original for any methods that need it
       original: cluster
@@ -154,15 +154,19 @@ export default defineComponent({
       metadata: {
         ...app.metadata
       },
+      isReady: false,
       clusterId: app.clusterId,
       error: app.error,
       type: 'failed',
-      sort: 2,
+      sort: 3,
       group: 'error',
       original: app
     }));
 
-    return [...clusterRows, ...failedRows];
+
+
+    const allRows = [...clusterRows, ...failedRows];
+    return allRows;
   },
 
     groupRowsBy() {
@@ -513,7 +517,12 @@ export default defineComponent({
             key-field="id"
             :search="true"
             class="cluster-table"
-            default-group-by="type"
+            :row-actions="false"
+            :selection="false"
+            :show-check-row="false"
+            :table-actions="false"
+            default-sort-by="status"
+            :default-sort-asc="true"
           >
             <template #header-left>
               <div class="row table-heading">
