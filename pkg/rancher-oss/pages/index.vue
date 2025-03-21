@@ -29,6 +29,9 @@ interface ClusterResource {
   metadata: {
     name: string;
     namespace?: string;
+    state?: {
+      message?: string;
+    };
   };
   spec?: any;
   status?: any;
@@ -43,6 +46,10 @@ interface AppResource {
   clusterId?: string;
   clusterName?: string;
   error?: string;
+  nameDisplay?: string;
+  state?: string;
+  group?: string;
+  type?: string;
 }
 
 export default defineComponent({
@@ -82,58 +89,96 @@ export default defineComponent({
       tableHeaders: [
         {
           name: 'status',
-          label: this.t ? this.t('tableHeaders.state') : 'Status',
+          label: 'Status',
           value: 'state',
           sort: ['state', 'nameDisplay'],
           width: 100
         },
         {
           name: 'name',
-          label: this.t ? this.t('tableHeaders.name') : 'Name',
+          label: 'Name',
           value: 'nameDisplay',
           sort: ['nameDisplay'],
           canBeVariable: true
         },
         {
           name: 'namespace',
-          label: this.t ? this.t('tableHeaders.namespace') : 'Namespace',
+          label: 'Namespace',
           value: 'metadata.namespace',
           sort: ['metadata.namespace']
         },
-        {
-          name: 'id',
-          label: this.t ? this.t('tableHeaders.id') : 'ID',
-          value: 'id',
-          sort: ['id'],
-          width: 280
-        }
       ],
-      failedInstallationsTableHeaders: [
-        {
-          name: 'vCluster',
-          label: 'vCluster',
-          value: 'metadata.name'
-        },
-        {
-          name: 'namespace',
-          label: 'Namespace',
-          value: 'metadata.namespace'
-        },
-        {
-          name: 'status',
-          label: 'Status',
-          value: 'error'
-        },
-        {
-          name: 'actions',
-          label: 'Actions',
-          value: 'actions'
-        }
-      ]
     };
   },
 
   computed: {
+    combinedRows() {
+    // Normalize cluster data
+    const clusterRows = this.clusters.map(cluster => ({
+      id: cluster.id,
+      name: cluster.nameDisplay,
+      description: cluster.spec?.description || '',
+      namespace: cluster.metadata?.namespace || '',
+      status: {
+        state: cluster.state,
+        isReady: cluster.isReady,
+        label: this.getClusterStatusLabel(cluster),
+        color: this.getStatusColor(cluster),
+      },
+      metadata: {
+        ...cluster.metadata
+      },
+      // Original data needed for other functions
+      isReady: cluster.isReady,
+      state: cluster.metadata?.state?.message || "",
+      // For grouping and identification
+      type: 'cluster',
+      sort: 1,
+      group: 'active',
+      // Keep the original for any methods that need it
+      original: cluster
+    }));
+
+    // Normalize failed installation data
+    const failedRows = this.failedInstallations.map(app => ({
+      id: app.id || `${app.clusterId}-${app.metadata?.namespace}-${app.metadata?.name}`,
+      name: app.metadata?.name || app.nameDisplay || 'Unknown vCluster',
+      description: `Failed installation in cluster: ${app.clusterName || 'Unknown'}`,
+      namespace: app.metadata?.namespace || '',
+      status: {
+        state: app.state || 'failed',
+        isReady: false,
+        label: app.error || 'Failed',
+        color: app.error?.includes('pending') ? 'bg-warning' : 'bg-error',
+      },
+      metadata: {
+        ...app.metadata
+      },
+      clusterId: app.clusterId,
+      error: app.error,
+      type: 'failed',
+      sort: 2,
+      group: 'error',
+      original: app
+    }));
+
+    return [...clusterRows, ...failedRows];
+  },
+
+    groupRowsBy() {
+      return [
+        {
+          id: 'active',
+          name: 'Active Clusters',
+          ref: 'active'
+        },
+        {
+          id: 'error',
+          name: 'Failed Installations',
+          ref: 'error'
+        }
+      ];
+    },
     selectedCluster(): ClusterResource | undefined {
       return this.clusters.find(c => c.id === this.selectedClusterId);
     },
@@ -224,7 +269,7 @@ export default defineComponent({
     },
 
     async fetchFailedVClusterApps() {
-      const failedApps = [];
+      const failedApps: AppResource[] = [];
 
       try {
         const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER);
@@ -233,9 +278,8 @@ export default defineComponent({
         for (const cluster of readyClusters) {
           try {
             if (!cluster.id) {
-          console.log('Skipping cluster with no ID:', cluster);
-          continue;
-        }
+              continue;
+            }
             const apps = await this.$store.dispatch('management/findAll', {
               type: CATALOG.APP,
               opt: {
@@ -243,8 +287,6 @@ export default defineComponent({
                 force: true
               }
             });
-
-            console.log('apps', apps);
 
             const clusterFailedApps = apps.filter((app: AppResource) => {
               const isLoftApp = app.spec?.chart?.metadata?.annotations?.['catalog.cattle.io/ui-source-repo'] === 'loft';
@@ -256,27 +298,27 @@ export default defineComponent({
               return isLoftApp && (isFailed || isPending);
             });
 
-            console.log('clusterFailedApps', clusterFailedApps);
-            console.log('cluster', cluster);
-
             clusterFailedApps.forEach((app: AppResource) => {
-              app.clusterId = cluster.id;
-              app.clusterName = cluster.spec?.displayName || cluster.metadata?.name;
-              app.error = this.getAppErrorMessage(app);
 
-              // Ensure app has a unique id for the key-field
-              if (!app.id) {
-                app.id = `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`;
-              }
+              failedApps.push({
+                id: `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`,
+                clusterId: cluster.id,
+                clusterName: cluster.spec?.displayName || cluster.metadata?.name,
+                nameDisplay: app.metadata?.name, // Add this for combined table
+                state: app.spec?.info?.status || 'failed', // Add this for combined table
+                error: this.getAppErrorMessage(app),
+                metadata: {
+                  name: app.metadata?.name,
+                  namespace: app.metadata?.namespace
+                },
+                group: 'Failed Installations',
+                type: 'failed'
+              });
             });
-
-            failedApps.push(...clusterFailedApps);
           } catch (error) {
             console.error(`Error fetching apps for cluster ${cluster.id}:`, error);
           }
         }
-
-        console.log('failedApps', failedApps);
 
         return failedApps;
       } catch (error) {
@@ -315,11 +357,11 @@ export default defineComponent({
 
       if (cluster.isReady) {
         return 'bg-success';
-      } else if (cluster.state === 'Provisioning' || cluster.state === 'Updating') {
+      } else if (cluster.status.state === 'Provisioning' || cluster.status.state === 'Updating') {
         return 'bg-info';
-      } else if (cluster.state === 'Failed' || cluster.state === 'Error') {
+      } else if (cluster.status.state === 'Failed' || cluster.status.state === 'Error') {
         return 'bg-error';
-      } else if (cluster.state === "unavailable") {
+      } else if (cluster.status.state === "unavailable") {
         return 'bg-neutral';
       } else {
         return 'bg-warning';
@@ -424,8 +466,8 @@ export default defineComponent({
 
       if (cluster.isReady) {
         return 'Ready';
-      } else if (cluster.state) {
-        return cluster.state;
+      } else if (cluster.status.state) {
+        return cluster.status.state;
       } else {
         return 'Unknown';
       }
@@ -479,17 +521,18 @@ export default defineComponent({
         <div class="col span-12">
           <SortableTable
             :headers="tableHeaders"
-            :rows="clusters"
+            :rows="combinedRows"
             key-field="id"
             :search="true"
             class="cluster-table"
+            default-group-by="type"
           >
             <template #header-left>
               <div class="row table-heading">
-                <h2 class="mb-0">vClusters List</h2>
+                <h2 class="mb-0">vClusters</h2>
                 <BadgeState
-                  v-if="clusters.length"
-                  :label="clusters.length.toString()"
+                  v-if="combinedRows.length"
+                  :label="combinedRows.length.toString()"
                   color="role-tertiary ml-20 mr-20"
                 />
               </div>
@@ -505,72 +548,65 @@ export default defineComponent({
                 </button>
               </div>
             </template>
-            <template #col:name="{ row }">
+            <template #group-by="{group}">
+              <div class="group-row">
+                <h3 class="group-tab">
+                  {{ group.id === 'active' ? 'Active Clusters' : 'Failed Installations' }}
+                </h3>
+                <div v-if="group.id === 'error'" class="group-description">
+                  These vCluster installations encountered errors or are still
+                  pending
+                </div>
+              </div>
+            </template>
+            <template #col:name="{row}">
               <td class="col-name">
                 <div class="list-cluster-name">
                   <p class="cluster-name">
-                    <router-link
-                      v-if="row.isReady"
-                      :to="{ path: `/c/${row.id}/apps/charts` }"
-                      role="link"
-                      :aria-label="row.nameDisplay"
-                    >
-                      {{ row.nameDisplay }}
-                    </router-link>
-                    <span v-else>{{ row.nameDisplay }}</span>
+                    <template v-if="row.type === 'cluster'">
+                      <router-link
+                        v-if="row.isReady"
+                        :to="{ path: `/c/${row.id}/apps/charts` }"
+                        role="link"
+                        :aria-label="row.nameDisplay"
+                      >
+                        {{ row.id }}
+                      </router-link>
+                      <span v-else>{{ row.id }}</span>
+                    </template>
+                    <template v-else>
+                      {{ row.metadata?.name || row.nameDisplay }}
+                    </template>
                   </p>
                   <p v-if="row.description" class="cluster-description">
                     {{ row.description }}
                   </p>
+                  <p v-if="row.state" class="cluster-description">
+                    {{ row.state }}
+                  </p>
                 </div>
               </td>
             </template>
-            <template #col:status="{ row }">
+            <template #col:status="{row}">
               <td>
-                <BadgeState
-                  :color="getStatusColor(row)"
-                  :label="getClusterStatusLabel(row)"
-                />
+                <template v-if="row.type === 'cluster'">
+                  <BadgeState
+                    :color="getStatusColor(row)"
+                    :label="getClusterStatusLabel(row)"
+                  />
+                </template>
+                <template v-else>
+                  <BadgeState
+                    :color="row.error && row.error.includes('pending') ? 'bg-warning' : 'bg-error'"
+                    :label="row.error || 'Error'"
+                  />
+                </template>
               </td>
             </template>
+            <template #cell:namespace="{row}">
+              {{ row.metadata?.namespace || '' }}
+            </template>
           </SortableTable>
-        </div>
-      </div>
-      <div class="row panel">
-        <div
-          v-if="failedInstallations.length > 0"
-          class="failed-installations mt-20"
-        >
-          <h2>Failed vCluster Installations</h2>
-          <table class="simple-table">
-            <thead>
-              <tr>
-                <th>vCluster Name</th>
-                <th>Namespace</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="app in failedInstallations" :key="app.id">
-                <td>{{ app.metadata?.name || 'Unknown' }}</td>
-                <td>{{ app.metadata?.namespace || 'Unknown' }}</td>
-                <td>
-                  <span class="badge-state bg-error">
-                    {{ app.error || 'Unknown error' }}
-                  </span>
-                </td>
-                <td>
-                  <button
-                    class="btn btn-sm role-primary"
-                    @click="navigateToApp(app)"
-                  >
-                    View Details
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -698,24 +734,5 @@ export default defineComponent({
     text-overflow: ellipsis;
     color: var(--muted);
   }
-}
-
-.simple-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-
-.simple-table th {
-  text-align: left;
-  padding: 10px;
-  border-bottom: 2px solid var(--border);
-  font-weight: bold;
-  background-color: var(--header-bg);
-}
-
-.simple-table td {
-  padding: 10px;
-  border-bottom: 1px solid var(--border);
 }
 </style>
