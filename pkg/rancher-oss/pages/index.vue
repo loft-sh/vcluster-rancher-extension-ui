@@ -11,7 +11,7 @@ import Select from '@shell/components/form/Select.vue';
 import SortableTable from '@shell/components/SortableTable/index.vue';
 import AsyncButton from '@shell/components/AsyncButton.vue';
 import VClusterCreateModal from '../components/VclusterCreateModal.vue';
-
+import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
 declare module 'vue/types/vue' {
   interface Vue {
@@ -46,8 +46,9 @@ export default defineComponent({
     SimpleBox: SimpleBox as any,
     Select: Select as any,
     SortableTable: SortableTable as any,
-    AsyncButton,
-    VClusterCreateModal: VClusterCreateModal as any
+    AsyncButton: AsyncButton as any,
+    VClusterCreateModal: VClusterCreateModal as any,
+    BadgeState: BadgeState as any
   },
 
   props: {
@@ -64,30 +65,38 @@ export default defineComponent({
       selectedClusterId: '',
       loading: false,
       showCreateDialog: false,
+      loadingRepos: false,
+      repoVersions: [] as Array<{ version: string;[key: string]: any }>,
+      selectedVersion: '',
       tableHeaders: [
         {
-          name: 'name',
-          label: 'Name',
-          value: 'nameDisplay'
-        },
-        {
-          name: 'id',
-          label: 'ID',
-          value: 'id'
-        },
-        {
           name: 'status',
-          label: 'Status'
+          label: this.t ? this.t('tableHeaders.state') : 'Status',
+          value: 'state',
+          sort: ['state', 'nameDisplay'],
+          width: 100
+        },
+        {
+          name: 'name',
+          label: this.t ? this.t('tableHeaders.name') : 'Name',
+          value: 'nameDisplay',
+          sort: ['nameDisplay'],
+          canBeVariable: true
         },
         {
           name: 'namespace',
-          label: 'Namespace',
-          value: 'metadata.namespace'
+          label: this.t ? this.t('tableHeaders.namespace') : 'Namespace',
+          value: 'metadata.namespace',
+          sort: ['metadata.namespace']
+        },
+        {
+          name: 'id',
+          label: this.t ? this.t('tableHeaders.id') : 'ID',
+          value: 'id',
+          sort: ['id'],
+          width: 280
         }
       ],
-      loadingRepos: false,
-      repoVersions: [] as Array<{version: string; [key: string]: any}>,
-      selectedVersion: ''
     };
   },
 
@@ -98,13 +107,13 @@ export default defineComponent({
 
     isNavigateDisabled(): boolean {
       return !this.selectedClusterId ||
-             !this.selectedCluster ||
-             this.loading ||
-             (this.selectedCluster && !this.selectedCluster.isReady);
+        !this.selectedCluster ||
+        this.loading ||
+        (this.selectedCluster && !this.selectedCluster.isReady);
     },
 
 
-    clusterOptions(): {label: string; value: string; disabled?: boolean}[] {
+    clusterOptions(): { label: string; value: string; disabled?: boolean }[] {
       return [
         {
           label: '-- Select a Cluster --',
@@ -118,7 +127,7 @@ export default defineComponent({
       ];
     },
 
-    versionOptions(): {label: string; value: string}[] {
+    versionOptions(): { label: string; value: string }[] {
 
       const options = [
         {
@@ -174,6 +183,37 @@ export default defineComponent({
   },
 
   methods: {
+    getStatusColor(cluster: ClusterResource): string {
+      console.log('cluster', cluster);
+      if (!cluster) {
+        return 'bg-warning';
+      }
+
+      if (cluster.isReady) {
+        return 'bg-success';
+      } else if (cluster.state === 'Provisioning' || cluster.state === 'Updating') {
+        return 'bg-info';
+      } else if (cluster.state === 'Failed' || cluster.state === 'Error') {
+        return 'bg-error';
+      } else if ( cluster.state === "unavailable") {
+        return 'bg-neutral';
+      } else {
+        return 'bg-warning';
+      }
+    },
+
+    t(key: string): string {
+      // Simple translation function to match home.vue style
+      // Replace with actual translation implementation if available
+      const translations: { [key: string]: string } = {
+        'tableHeaders.name': 'Name',
+        'tableHeaders.state': 'Status',
+        'tableHeaders.namespace': 'Namespace',
+        'tableHeaders.id': 'ID'
+      };
+
+      return translations[key] || key;
+    },
 
     async loadRepoVersions(): Promise<void> {
       this.loadingRepos = true;
@@ -312,24 +352,69 @@ export default defineComponent({
 
 <template>
   <div class="vcluster-oss-plugin">
-    <!-- Simple clusters table -->
+    <!-- Clusters table styled like home.vue -->
     <div class="clusters-table-container">
-      <h2 class="clusters-title">vClusters List</h2>
-      <div class="create-button-container">
-        <button class="btn role-primary" @click="openCreateDialog">
-          Create vCluster
-        </button>
+      <div class="row panel">
+        <div class="col span-12">
+          <SortableTable
+            :headers="tableHeaders"
+            :rows="clusters"
+            key-field="id"
+            :search="true"
+            class="cluster-table"
+          >
+            <template #header-left>
+              <div class="row table-heading">
+                <h2 class="mb-0">vClusters List</h2>
+                <BadgeState
+                  v-if="clusters.length"
+                  :label="clusters.length.toString()"
+                  color="role-tertiary ml-20 mr-20"
+                />
+              </div>
+            </template>
+            <template #header-middle>
+              <div class="table-heading">
+                <button
+                  class="btn btn-sm role-primary"
+                  @click="openCreateDialog"
+                  data-testid="vcluster-create-button"
+                >
+                  Create vCluster
+                </button>
+              </div>
+            </template>
+            <template #col:name="{ row }">
+              <td class="col-name">
+                <div class="list-cluster-name">
+                  <p class="cluster-name">
+                    <router-link
+                      v-if="row.isReady"
+                      :to="{ path: `/c/${row.id}/apps/charts` }"
+                      role="link"
+                      :aria-label="row.nameDisplay"
+                    >
+                      {{ row.nameDisplay }}
+                    </router-link>
+                    <span v-else>{{ row.nameDisplay }}</span>
+                  </p>
+                  <p v-if="row.description" class="cluster-description">
+                    {{ row.description }}
+                  </p>
+                </div>
+              </td>
+            </template>
+            <template #col:status="{ row }">
+              <td>
+                <BadgeState
+                  :color="getStatusColor(row)"
+                  :label="getClusterStatusLabel(row)"
+                />
+              </td>
+            </template>
+          </SortableTable>
+        </div>
       </div>
-      <SortableTable
-        :headers="tableHeaders"
-        :rows="clusters"
-        key-field="id"
-        :search="true"
-      >
-        <template #col:status="{row}">
-          {{ getClusterStatusLabel(row) }}
-        </template>
-      </SortableTable>
     </div>
 
     <VClusterCreateModal
@@ -353,6 +438,14 @@ export default defineComponent({
 <style lang="css">
 .option img[src*="vclusterLogo"] {
   filter: none !important;
+}
+
+.bg-neutral {
+  background-color: var(--muted) !important;
+}
+
+.badge-state {
+  text-transform: capitalize;
 }
 
 /* Component specific */
@@ -413,7 +506,40 @@ export default defineComponent({
   margin-top: 10px;
 }
 
-.dialog-buttons > *:not(:last-child) {
+.dialog-buttons>*:not(:last-child) {
   margin-right: 10px;
+}
+
+.table-heading {
+  align-items: center;
+  display: flex;
+  height: 39px;
+
+  &>button {
+    margin-left: 10px;
+  }
+
+  h2 {
+    font-size: 16px;
+    margin-bottom: 0;
+  }
+}
+
+.col-name {
+  max-width: 280px;
+}
+
+.list-cluster-name {
+  .cluster-name {
+    display: flex;
+    align-items: center;
+  }
+
+  .cluster-description {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--muted);
+  }
 }
 </style>
