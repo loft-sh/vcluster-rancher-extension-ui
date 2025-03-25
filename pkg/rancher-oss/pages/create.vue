@@ -13,8 +13,8 @@ import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 import { mapGetters, Store } from 'vuex';
 import jsyaml from 'js-yaml';
 
-import { NAMESPACE } from '@shell/config/types';
-import { PRODUCT_NAME } from '../constants';
+import { CATALOG, NAMESPACE } from '@shell/config/types';
+import { LOFT_CHART_URL, PRODUCT_NAME } from '../constants';
 
 declare module 'vue/types/vue' {
   interface Vue {
@@ -119,8 +119,12 @@ export default defineComponent({
         if (!this.versionParam) {
           throw new Error('Version parameter is required');
         }
+        const allRepos = await this.$store.dispatch('management/findAll', {
+          type: CATALOG.CLUSTER_REPO
+        });
 
-        const response = await fetch(`/v1/catalog.cattle.io.clusterrepos/loft?link=info&chartName=vcluster&version=${this.versionParam}`, {
+        const loftRepo = allRepos.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
+        const response = await fetch(`/v1/catalog.cattle.io.clusterrepos/${loftRepo.id}?link=info&chartName=vcluster&version=${this.versionParam}`, {
           headers: {
             'Accept': 'application/json'
           },
@@ -163,15 +167,21 @@ export default defineComponent({
       const chartName = "vcluster"
       const version = this.$route.query.version
       const inStore = this.$store.getters['currentStore']();
+      const loftRepo = this.$store.getters['management/all'](CATALOG.CLUSTER_REPO)?.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
 
-      // Get project ID - handle both existing and new namespaces
+      if (!loftRepo) {
+        cb(false);
+        this.$store.dispatch('growl/error', {
+          title: 'Error',
+          message: 'vCluster chart repository not found'
+        });
+        return;
+      }
+
       let projectId;
-
       if (this.isNewNamespace) {
-        // For new namespace, use the selected project from your form
         projectId = this.selectedProjectId;
       } else {
-        // For existing namespace, find it from the store
         const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
         const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace);
         projectId = namespaceObject?.metadata?.labels["field.cattle.io/projectId"];
@@ -186,10 +196,19 @@ export default defineComponent({
         return;
       }
 
-      let values = {};
+      let values = {
+        global: {
+          cattle: {
+            clusterId: clusterId,
+            clusterName: this.value.metadata.name,
+            systemProjectId: projectId,
+            url: window.location.origin,
+          }
+        }
+      };
       try {
         const yamlValues = jsyaml.load(this.yamlValue);
-        values = yamlValues
+        Object.assign(values, yamlValues);
       } catch (error) {
         console.error('Error parsing YAML:', error);
         cb(false);
@@ -204,7 +223,7 @@ export default defineComponent({
             releaseName: this.value.metadata.name,
             annotations: {
               "catalog.cattle.io/ui-source-repo-type": "cluster",
-              "catalog.cattle.io/ui-source-repo": "loft"
+              "catalog.cattle.io/ui-source-repo": loftRepo.id
             },
             values
           }
@@ -228,15 +247,14 @@ export default defineComponent({
       };
 
       const csrfToken = getCookie('CSRF') || '';
-
-      fetch('/v1/catalog.cattle.io.clusterrepos/loft?action=install', {
+      fetch(`/k8s/clusters/${clusterId}/v1/catalog.cattle.io.clusterrepos/${loftRepo.id}?action=install`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
           'x-api-csrf': csrfToken
         },
-        credentials: 'same-origin',
+        credentials: 'include',
         body: JSON.stringify(payload)
       })
         .then(response => {

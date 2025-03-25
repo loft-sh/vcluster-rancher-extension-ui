@@ -1,6 +1,11 @@
-<script>
-import { PRODUCT_NAME } from '../constants';
+<script lang="ts">
+import { ClusterResource } from '../pages/index.vue';
+import { PRODUCT_NAME, LOFT_CHART_URL } from '../constants';
 import VClusterCreateModal from './VclusterCreateModal.vue';
+import { Store } from 'vuex';
+import { CATALOG } from '@shell/config/types';
+
+
 
 export default {
   name: 'VClusterClusterCreateItem',
@@ -8,11 +13,18 @@ export default {
     VClusterCreateModal
   },
 
+  props: {
+    $store: {
+      type: Store<any>,
+      required: true
+    }
+  },
+
   data() {
     return {
       showModal: false,
       clusterOptions: [],
-      versionOptions: [],
+      versionOptions: [] as { label: string, value: string }[],
       selectedClusterId: '',
       selectedVersion: '',
       loading: false,
@@ -31,11 +43,11 @@ export default {
       this.showModal = false;
     },
 
-    onClusterSelected(clusterId) {
+    onClusterSelected(clusterId: string) {
       this.selectedClusterId = clusterId;
     },
 
-    onVersionSelected(version) {
+    onVersionSelected(version: string) {
       this.selectedVersion = version;
     },
 
@@ -46,8 +58,8 @@ export default {
         const clusters = this.$store.getters[`${inStore}/all`]('management.cattle.io.cluster');
 
         this.clusterOptions = clusters
-          .filter(cluster => cluster.isReady)
-          .map(cluster => ({
+          .filter((cluster: ClusterResource) => cluster.isReady)
+          .map((cluster: ClusterResource) => ({
             label: cluster.nameDisplay,
             value: cluster.id,
             disabled: !cluster.isReady
@@ -61,22 +73,18 @@ export default {
 
     async fetchVersions() {
       this.loadingRepos = true;
-      try {
-        const response = await fetch('/v1/catalog.cattle.io.clusterrepos/loft?link=index', {
-          headers: {
-            'Accept': 'application/json'
-          },
-          credentials: 'same-origin'
-        });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch chart versions: ${response.statusText}`);
-        }
+      const allRepos = await this.$store.dispatch('management/findAll', {
+        type: CATALOG.CLUSTER_REPO
+      });
 
-        const data = await response.json();
-        const vclusterEntries = data.entries?.vcluster || [];
+      const loftRepo = allRepos.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
 
-        const filteredVersions = vclusterEntries.filter(entry => {
+      if (loftRepo) {
+        const indexResponse = await loftRepo.followLink('index');
+        const vcluster = indexResponse.entries.vcluster || [];
+
+        const filteredVersions = vcluster.filter((entry: { version: string }) => {
           const version = entry.version;
           const versionParts = version.split('.');
 
@@ -87,24 +95,22 @@ export default {
           return !version.includes('rc') && !version.includes('beta') && !version.includes('alpha');
         });
 
-        this.versionOptions = filteredVersions.map((entry, index) => ({
+        this.versionOptions = filteredVersions.map((entry: { version: string }, index: number) => ({
           label: `${entry.version} ${index === 0 ? '(default)' : ''}`,
           value: entry.version
-        })).sort((a, b) => {
+        })).sort((a: { value: string }, b: { value: string }) => {
           return b.value.localeCompare(a.value, undefined, { numeric: true });
-        });
+        })
 
         if (this.versionOptions.length > 0) {
           this.selectedVersion = this.versionOptions[0].value;
         }
-      } catch (error) {
-        console.error('Error fetching versions:', error);
-      } finally {
+
         this.loadingRepos = false;
       }
     },
 
-    handleCreate(callback) {
+    handleCreate(callback: (success: boolean) => void) {
       if (!this.selectedClusterId || !this.selectedVersion) {
         callback(false);
         return;
@@ -139,6 +145,7 @@ export default {
     </div>
 
     <VClusterCreateModal
+      :$store="$store"
       v-if="showModal"
       :show="showModal"
       :cluster-options="clusterOptions"
@@ -156,20 +163,20 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-  body.theme-light {
-    .provider-card {
+body.theme-light {
+  .provider-card {
+    background-color: white;
+
+    &:hover {
       background-color: white;
-
-      &:hover {
-        background-color: white;
-        box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
-      }
-    }
-
-    .provider-name {
-      color: black;
+      box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.1);
     }
   }
+
+  .provider-name {
+    color: black;
+  }
+}
 
 
 .my-tab-component {

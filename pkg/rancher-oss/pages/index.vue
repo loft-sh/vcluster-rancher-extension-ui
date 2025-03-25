@@ -13,6 +13,9 @@ import AsyncButton from '@shell/components/AsyncButton.vue';
 import VClusterCreateModal from '../components/VclusterCreateModal.vue';
 import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
+import { LOFT_CHART_URL } from '../constants';
+
+
 declare module 'vue/types/vue' {
   interface Vue {
     $store: Store<any>;
@@ -20,7 +23,7 @@ declare module 'vue/types/vue' {
   }
 }
 
-interface ClusterResource {
+export interface ClusterResource {
   id: string;
   nameDisplay: string;
   isReady?: boolean;
@@ -87,13 +90,13 @@ export default defineComponent({
       repoVersions: [] as Array<{ version: string;[key: string]: any }>,
       selectedVersion: '',
       tableHeaders: [
-      {
-    name: 'status',
-    label: 'Status',
-    value: 'state',
-    sort: ['sort'],
-    width: 100
-  },
+        {
+          name: 'status',
+          label: 'Status',
+          value: 'state',
+          sort: ['sort'],
+          width: 100
+        },
         {
           name: 'name',
           label: 'Name',
@@ -113,61 +116,61 @@ export default defineComponent({
 
   computed: {
     combinedRows() {
-    // Normalize cluster data
-    const clusterRows = this.clusters.map(cluster => ({
-      id: cluster.id,
-      name: cluster.nameDisplay,
-      description: cluster.spec?.description || '',
-      namespace: cluster.metadata?.namespace || '',
-      status: {
-        state: cluster.state,
+      // Normalize cluster data
+      const clusterRows = this.clusters.map(cluster => ({
+        id: cluster.id,
+        name: cluster.nameDisplay,
+        description: cluster.spec?.description || '',
+        namespace: cluster.metadata?.namespace || '',
+        status: {
+          state: cluster.state,
+          isReady: cluster.isReady,
+          label: this.getClusterStatusLabel(cluster),
+          color: this.getStatusColor(cluster),
+        },
+        metadata: {
+          ...cluster.metadata
+        },
+        // Original data needed for other functions
         isReady: cluster.isReady,
-        label: this.getClusterStatusLabel(cluster),
-        color: this.getStatusColor(cluster),
-      },
-      metadata: {
-        ...cluster.metadata
-      },
-      // Original data needed for other functions
-      isReady: cluster.isReady,
-      state: cluster.metadata?.state?.message || "",
-      // For grouping and identification
-      type: 'cluster',
-      sort: cluster.isReady ? 1 : 2,
-      group: 'active',
-      // Keep the original for any methods that need it
-      original: cluster
-    }));
+        state: cluster.metadata?.state?.message || "",
+        // For grouping and identification
+        type: 'cluster',
+        sort: cluster.isReady ? 1 : 2,
+        group: 'active',
+        // Keep the original for any methods that need it
+        original: cluster
+      }));
 
-    // Normalize failed installation data
-    const failedRows = this.failedInstallations.map(app => ({
-      id: app.id || `${app.clusterId}-${app.metadata?.namespace}-${app.metadata?.name}`,
-      name: app.metadata?.name || app.nameDisplay || 'Unknown vCluster',
-      description: `Failed installation in cluster: ${app.clusterName || 'Unknown'}`,
-      namespace: app.metadata?.namespace || '',
-      status: {
-        state: app.state || 'failed',
+      // Normalize failed installation data
+      const failedRows = this.failedInstallations.map(app => ({
+        id: app.id || `${app.clusterId}-${app.metadata?.namespace}-${app.metadata?.name}`,
+        name: app.metadata?.name || app.nameDisplay || 'Unknown vCluster',
+        description: `Failed installation in cluster: ${app.clusterName || 'Unknown'}`,
+        namespace: app.metadata?.namespace || '',
+        status: {
+          state: app.state || 'failed',
+          isReady: false,
+          label: app.error || 'Failed',
+          color: app.error?.includes('pending') ? 'bg-warning' : 'bg-error',
+        },
+        metadata: {
+          ...app.metadata
+        },
         isReady: false,
-        label: app.error || 'Failed',
-        color: app.error?.includes('pending') ? 'bg-warning' : 'bg-error',
-      },
-      metadata: {
-        ...app.metadata
-      },
-      isReady: false,
-      clusterId: app.clusterId,
-      error: app.error,
-      type: 'failed',
-      sort: 3,
-      group: 'error',
-      original: app
-    }));
+        clusterId: app.clusterId,
+        error: app.error,
+        type: 'failed',
+        sort: 3,
+        group: 'error',
+        original: app
+      }));
 
 
 
-    const allRows = [...clusterRows, ...failedRows];
-    return allRows;
-  },
+      const allRows = [...clusterRows, ...failedRows];
+      return allRows;
+    },
 
     groupRowsBy() {
       return [
@@ -278,6 +281,7 @@ export default defineComponent({
       try {
         const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER);
         const readyClusters = mgmtClusters.filter((cluster: ClusterResource) => cluster.isReady);
+        const loftRepo = this.$store.getters['management/all'](CATALOG.CLUSTER_REPO)?.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
 
         for (const cluster of readyClusters) {
           try {
@@ -293,7 +297,7 @@ export default defineComponent({
             });
 
             const clusterFailedApps = apps.filter((app: AppResource) => {
-              const isLoftApp = app.spec?.chart?.metadata?.annotations?.['catalog.cattle.io/ui-source-repo'] === 'loft';
+              const isLoftApp = app.spec?.chart?.metadata?.annotations?.['catalog.cattle.io/ui-source-repo'] === loftRepo?.id;
 
               const isFailed = app.spec?.info?.status === 'failed';
               const isPending = app.metadata?.state?.name === 'pending-install';
@@ -374,40 +378,32 @@ export default defineComponent({
     async loadRepoVersions(): Promise<void> {
       this.loadingRepos = true;
 
-      try {
-        const response = await fetch('/v1/catalog.cattle.io.clusterrepos/loft?link=index', {
-          headers: {
-            'Accept': 'application/json'
-          },
-          credentials: 'same-origin'
+      const allRepos = await this.$store.dispatch('management/findAll', {
+        type: CATALOG.CLUSTER_REPO
+      });
+
+      const loftRepo = allRepos.find((repo: any) => repo.spec.url === LOFT_CHART_URL);
+
+      if (loftRepo) {
+        const indexResponse = await loftRepo.followLink('index');
+        const vcluster = indexResponse.entries.vcluster
+
+        this.repoVersions = vcluster.filter((versObject: {
+          version: string;
+        }) => {
+          const version = versObject.version;
+          const versionParts = version.split('.');
+          if (parseInt(versionParts[1]) < 19) {
+            return false;
+          }
+
+          return !version.includes('rc') && !version.includes('beta') && !version.includes('alpha');
         });
 
-        if (response.ok) {
-          const data = await response.json();
-
-          const vcluster = data.entries.vcluster
-
-          this.repoVersions = vcluster.filter((versObject: {
-            version: string;
-          }) => {
-            const version = versObject.version;
-            const versionParts = version.split('.');
-            if (parseInt(versionParts[1]) < 19) {
-              return false;
-            }
-
-            return !version.includes('rc') && !version.includes('beta') && !version.includes('alpha');
-          });
-
-          if (this.repoVersions.length > 0 && this.repoVersions[0]?.version) {
-            this.selectedVersion = this.repoVersions[0].version;
-          }
-        } else {
-          console.error('Failed to fetch repository data:', response.statusText);
+        if (this.repoVersions.length > 0 && this.repoVersions[0]?.version) {
+          this.selectedVersion = this.repoVersions[0].version;
         }
-      } catch (error) {
-        console.error('Failed to load repository versions:', error);
-      } finally {
+
         this.loadingRepos = false;
       }
     },
@@ -545,7 +541,7 @@ export default defineComponent({
                 </button>
               </div>
             </template>
-            <template #group-by="{group}">
+            <template #group-by="{ group }">
               <div class="group-row">
                 <h3 class="group-tab">
                   {{ group.id === 'active' ? 'Active Clusters' : 'Failed Installations' }}
@@ -556,7 +552,7 @@ export default defineComponent({
                 </div>
               </div>
             </template>
-            <template #col:name="{row}">
+            <template #col:name="{ row }">
               <td class="col-name">
                 <div class="list-cluster-name">
                   <p class="cluster-name">
@@ -584,7 +580,7 @@ export default defineComponent({
                 </div>
               </td>
             </template>
-            <template #col:status="{row}">
+            <template #col:status="{ row }">
               <td>
                 <template v-if="row.type === 'cluster'">
                   <BadgeState
@@ -600,7 +596,7 @@ export default defineComponent({
                 </template>
               </td>
             </template>
-            <template #cell:namespace="{row}">
+            <template #cell:namespace="{ row }">
               {{ row.metadata?.namespace || '' }}
             </template>
           </SortableTable>
