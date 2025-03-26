@@ -1,7 +1,7 @@
 <script lang="ts">
 import { defineComponent, PropType } from 'vue';
 import { Store } from 'vuex';
-import { CATALOG, MANAGEMENT } from '@shell/config/types';
+import { CAPI, CATALOG, MANAGEMENT, NORMAN } from '@shell/config/types';
 import LabelValue from '@shell/components/LabelValue.vue';
 import InfoBox from '@shell/components/InfoBox.vue';
 import ClusterIconMenu from '@shell/components/ClusterIconMenu.vue';
@@ -14,6 +14,7 @@ import VClusterCreateModal from '../components/VclusterCreateModal.vue';
 import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
 import { LOFT_CHART_URL } from '../constants';
+import { allHash } from '@shell/utils/promise';
 
 
 declare module 'vue/types/vue' {
@@ -35,6 +36,7 @@ export interface ClusterResource {
     state?: {
       message?: string;
     };
+    labels?: Record<string, string>;
   };
   spec?: any;
   status?: any;
@@ -82,6 +84,7 @@ export default defineComponent({
     return {
       originalStyles: new Map<Element, string>(),
       clusters: [] as ClusterResource[],
+      vClusters: [] as ClusterResource[],
       failedInstallations: [] as AppResource[],
       selectedClusterId: '',
       loading: false,
@@ -117,12 +120,21 @@ export default defineComponent({
   computed: {
     combinedRows() {
       // Normalize cluster data
-      const clusterRows = this.clusters.map(cluster => ({
-        id: cluster.id,
-        name: cluster.nameDisplay,
-        description: cluster.spec?.description || '',
-        namespace: cluster.metadata?.namespace || '',
-        status: {
+      const clusterRows = this.vClusters.map(cluster => {
+        console.log(cluster)
+
+
+
+        const linkId = cluster.id.split('/').pop()
+        const id = linkId?.split('-').pop()
+
+        return {
+          id: id,
+          name: cluster.nameDisplay,
+          linkTo: `/c/_/manager/provisioning.cattle.io.cluster/${cluster.id}#node-pools`,
+          description: cluster.spec?.description || '',
+          namespace: cluster.metadata?.namespace || '',
+          status: {
           state: cluster.state,
           isReady: cluster.isReady,
           label: this.getClusterStatusLabel(cluster),
@@ -138,13 +150,15 @@ export default defineComponent({
         type: 'cluster',
         sort: cluster.isReady ? 1 : 2,
         group: 'active',
-        // Keep the original for any methods that need it
-        original: cluster
-      }));
+          // Keep the original for any methods that need it
+          original: cluster
+        }
+      });
 
       // Normalize failed installation data
       const failedRows = this.failedInstallations.map(app => ({
         id: app.id || `${app.clusterId}-${app.metadata?.namespace}-${app.metadata?.name}`,
+        linkTo: `/c/${app.clusterId}/apps/charts`,
         name: app.metadata?.name || app.nameDisplay || 'Unknown vCluster',
         description: `Failed installation in cluster: ${app.clusterName || 'Unknown'}`,
         namespace: app.metadata?.namespace || '',
@@ -408,9 +422,21 @@ export default defineComponent({
       }
     },
 
-    loadClusters(): void {
-      const mgmtClusters: ClusterResource[] = this.$store.getters['management/all'](MANAGEMENT.CLUSTER);
-      this.clusters = [...mgmtClusters];
+    async loadClusters(): Promise<void> {
+      const mgmtClusters: ClusterResource[] = await this.$store.dispatch('management/findAll', { type: CAPI.RANCHER_CLUSTER })
+
+      // we need to filter the ones that have : "loft.sh/vcluster-project-uid" and "loft.sh/vcluster-service-uid".
+      const filteredClusters = mgmtClusters.filter((cluster: ClusterResource) => {
+        return cluster.metadata?.labels?.['loft.sh/vcluster-project-uid'] && cluster.metadata?.labels?.['loft.sh/vcluster-service-uid']
+      })
+
+      const noVClusters = mgmtClusters.filter((cluster: ClusterResource) => {
+        return !cluster.metadata?.labels?.['loft.sh/vcluster-project-uid'] && !cluster.metadata?.labels?.['loft.sh/vcluster-service-uid']
+      })
+
+
+      this.clusters = [...noVClusters];
+      this.vClusters = [...filteredClusters];
 
       this.clusters.sort((a, b) => {
         return (a.nameDisplay || '').localeCompare(b.nameDisplay || '');
@@ -522,7 +548,7 @@ export default defineComponent({
           >
             <template #header-left>
               <div class="row table-heading">
-                <h2 class="mb-0">vClusters</h2>
+                <h2 class="mb-0">Virtual Clusters</h2>
                 <BadgeState
                   v-if="combinedRows.length"
                   :label="combinedRows.length.toString()"
@@ -559,7 +585,7 @@ export default defineComponent({
                     <template v-if="row.type === 'cluster'">
                       <router-link
                         v-if="row.isReady"
-                        :to="{ path: `/c/${row.id}/apps/charts` }"
+                        :to="{ path: row.linkTo }"
                         role="link"
                         :aria-label="row.nameDisplay"
                       >
@@ -568,7 +594,15 @@ export default defineComponent({
                       <span v-else>{{ row.id }}</span>
                     </template>
                     <template v-else>
-                      {{ row.metadata?.name || row.nameDisplay }}
+                      <router-link
+                        v-if="row.isReady"
+                        :to="{ path: row.linkTo }"
+                        role="link"
+                        :aria-label="row.nameDisplay"
+                      >
+                        {{ row.id }}
+                      </router-link>
+                      <span v-else>{{ row.id }}</span>
                     </template>
                   </p>
                   <p v-if="row.description" class="cluster-description">
