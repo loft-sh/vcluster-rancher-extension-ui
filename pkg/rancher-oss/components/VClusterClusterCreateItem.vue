@@ -5,8 +5,6 @@ import VClusterCreateModal from './VclusterCreateModal.vue';
 import { Store } from 'vuex';
 import { CATALOG } from '@shell/config/types';
 
-
-
 export default {
   name: 'VClusterClusterCreateItem',
   components: {
@@ -17,6 +15,12 @@ export default {
     $store: {
       type: Store<any>,
       required: true
+    }
+  },
+
+  computed: {
+    isCreatePage(): boolean {
+      return this.$route.path.includes('/create');
     }
   },
 
@@ -131,7 +135,7 @@ export default {
 </script>
 
 <template>
-  <div class="my-tab-component">
+  <div v-if="isCreatePage" class="my-tab-component">
     <h4 class="title">Create a vCluster in a Rancher Cluster</h4>
 
     <div class="provider-cards">
@@ -178,7 +182,6 @@ body.theme-light {
   }
 }
 
-
 .my-tab-component {
   padding-top: 24px;
 
@@ -194,7 +197,6 @@ body.theme-light {
     height: 4px;
     background-color: #f27405;
   }
-
 
   .provider-cards {
     display: grid;
@@ -234,8 +236,6 @@ body.theme-light {
       border: 1px solid #f27405;
     }
   }
-
-
 
   .provider-logo {
     width: 60px;
