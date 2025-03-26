@@ -89,9 +89,6 @@ export default defineComponent({
       selectedClusterId: '',
       loading: false,
       showCreateDialog: false,
-      loadingRepos: false,
-      repoVersions: [] as Array<{ version: string;[key: string]: any }>,
-      selectedVersion: '',
       tableHeaders: [
         {
           name: 'status',
@@ -212,50 +209,23 @@ export default defineComponent({
     },
 
     clusterOptions(): { label: string; value: string; disabled?: boolean }[] {
+      const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[]
       return [
         {
           label: '-- Select a Cluster --',
           value: '',
         },
-        ...this.clusters.map(cluster => ({
+        ...mgmtClusters.map(cluster => ({
           label: `${cluster.nameDisplay} ${!cluster.isReady ? `(${this.getClusterStatusLabel(cluster)})` : ''}`,
           value: cluster.id,
           disabled: !cluster.isReady
         }))
       ];
-    },
-
-    versionOptions(): { label: string; value: string }[] {
-      const options = [
-        {
-          label: '-- Select a Version --',
-          value: '',
-        }
-      ];
-
-      if (Array.isArray(this.repoVersions) && this.repoVersions.length > 0) {
-        this.repoVersions.forEach((versObj: any, index: number) => {
-          if (versObj && typeof versObj === 'object' && 'version' in versObj) {
-            const isLatest = index === 0;
-            options.push({
-              label: versObj.version + (isLatest ? ' (Default)' : ''),
-              value: versObj.version
-            });
-          }
-        });
-      }
-
-      if (options.length > 1) {
-        options.shift();
-      }
-
-      return options;
     }
   },
 
   created(): void {
     this.loadClusters();
-    this.loadRepoVersions();
   },
 
   mounted() {
@@ -387,41 +357,6 @@ export default defineComponent({
       }
     },
 
-
-
-    async loadRepoVersions(): Promise<void> {
-      this.loadingRepos = true;
-
-      const allRepos = await this.$store.dispatch('management/findAll', {
-        type: CATALOG.CLUSTER_REPO
-      });
-
-      const loftRepo = allRepos.find((repo: any) => repo.spec.url === LOFT_CHART_URL);
-
-      if (loftRepo) {
-        const indexResponse = await loftRepo.followLink('index');
-        const vcluster = indexResponse.entries.vcluster
-
-        this.repoVersions = vcluster.filter((versObject: {
-          version: string;
-        }) => {
-          const version = versObject.version;
-          const versionParts = version.split('.');
-          if (parseInt(versionParts[1]) < 19) {
-            return false;
-          }
-
-          return !version.includes('rc') && !version.includes('beta') && !version.includes('alpha');
-        });
-
-        if (this.repoVersions.length > 0 && this.repoVersions[0]?.version) {
-          this.selectedVersion = this.repoVersions[0].version;
-        }
-
-        this.loadingRepos = false;
-      }
-    },
-
     async loadClusters(): Promise<void> {
       const mgmtClusters: ClusterResource[] = await this.$store.dispatch('management/findAll', { type: CAPI.RANCHER_CLUSTER })
 
@@ -445,10 +380,6 @@ export default defineComponent({
 
     onClusterSelected(value: string): void {
       this.selectedClusterId = value;
-    },
-
-    onVersionSelected(value: string): void {
-      this.selectedVersion = value;
     },
 
     async navigateToCluster(): Promise<void> {
@@ -489,25 +420,17 @@ export default defineComponent({
 
     openCreateDialog() {
       this.showCreateDialog = true;
-
-      if (this.selectedVersion === '' && this.repoVersions.length > 0 && this.repoVersions[0]?.version) {
-        this.selectedVersion = this.repoVersions[0].version;
-      }
     },
 
     closeCreateDialog(result: boolean) {
       this.showCreateDialog = false;
-      this.selectedVersion = '';
     },
 
     handleCreateDialogOkay(callback: (ok: boolean) => void) {
-      const urlRoute = `/${this.$route.meta.product}/c/${this.selectedClusterId}/create?version=${this.selectedVersion}`;
+      const urlRoute = `/${this.$route.meta.product}/c/${this.selectedClusterId}/create`;
 
       this.$router.push({
-        path: urlRoute,
-        query: {
-          version: this.selectedVersion
-        }
+        path: urlRoute
       });
     }
   },
@@ -641,13 +564,9 @@ export default defineComponent({
     <VClusterCreateModal
       :show="showCreateDialog"
       :cluster-options="clusterOptions"
-      :version-options="versionOptions"
       :selected-cluster-id="selectedClusterId"
-      :selected-version="selectedVersion"
       :loading="loading"
-      :loading-repos="loadingRepos"
       @update:selected-cluster-id="onClusterSelected"
-      @update:selected-version="onVersionSelected"
       @close="closeCreateDialog"
       @create="handleCreateDialogOkay"
     />

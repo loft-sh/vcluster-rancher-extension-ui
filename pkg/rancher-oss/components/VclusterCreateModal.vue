@@ -79,12 +79,44 @@ export default defineComponent({
       isLoftInstalled: false,
       checkingLoftInstallation: false,
       installingLoftChart: false,
-      installError: ''
+      installError: '',
+      loadingRepos: false,
+      repoVersions: [] as Array<{ version: string;[key: string]: any }>,
+      selectedVersion: '',
+      pollingInterval: null as number | null,
+      currentPollingAttempt: 0,
+      maxPollingAttempts: 10
     };
   },
 
+  computed: {
+    computedVersionOptions(): { label: string; value: string }[] {
+
+      if (!Array.isArray(this.repoVersions) || this.repoVersions.length === 0) {
+        return [];
+      }
+
+      const options = this.repoVersions
+        .filter((versObj: any) => {
+          if (!versObj || typeof versObj !== 'object' || !('version' in versObj)) {
+            return false;
+          }
+          return true;
+        })
+        .map((versObj: any, index: number) => {
+          const isLatest = index === 0;
+          return {
+            label: versObj.version + (isLatest ? ' (Default)' : ''),
+            value: versObj.version
+          };
+        });
+
+      return options;
+    }
+  },
+
   watch: {
-    versionOptions: {
+    computedVersionOptions: {
       handler(newOptions) {
         // Auto-select the latest version when options become available
         if (this.isLoftInstalled && newOptions.length > 0 && !this.selectedVersion && !this.loadingRepos) {
@@ -100,23 +132,82 @@ export default defineComponent({
       this.$emit('update:selectedClusterId', value);
       this.$emit('update:selectedVersion', '');
       this.installError = '';
+      this.repoVersions = [];
+      this.selectedVersion = '';
 
       if (value) {
         this.checkingLoftInstallation = true;
         this.isLoftInstalled = await this.isLoftChartInstalledOnCluster(value);
         this.checkingLoftInstallation = false;
 
-        // Auto-select the latest version if versionOptions are available
-        if (this.isLoftInstalled && this.versionOptions.length > 0 && !this.loadingRepos) {
-          // Assuming the first option is the latest version
-          this.onVersionSelected(this.versionOptions[0].value);
+        if (this.isLoftInstalled) {
+          await this.loadRepoVersions(value);
         }
       } else {
         this.isLoftInstalled = false;
       }
     },
 
+    async checkAndLoadRepoVersions(clusterId: string): Promise<boolean> {
+      try {
+        const allRepos = await this.$store.dispatch('management/findAll', {
+          type: CATALOG.CLUSTER_REPO,
+          opt: {
+            url: `/k8s/clusters/${clusterId}/v1/catalog.cattle.io.clusterrepos`
+          }
+        });
+
+        const loftRepo = allRepos.find((repo: any) => repo.spec.url === LOFT_CHART_URL);
+
+        if (loftRepo) {
+          const indexResponse = await loftRepo.followLink('index');
+          const vcluster = indexResponse.entries.vcluster;
+
+          if (vcluster && vcluster.length > 0) {
+            this.repoVersions = vcluster.filter((versObject: { version: string }) => {
+              if (!versObject || !versObject.version) {
+                return false;
+              }
+
+              const version = versObject.version;
+              const versionParts = version.split('.');
+              if (parseInt(versionParts[1]) < 19) {
+                return false;
+              }
+
+              const isValid = !version.includes('rc') && !version.includes('beta') && !version.includes('alpha');
+              return isValid;
+            });
+
+            if (this.repoVersions.length > 0 && this.repoVersions[0]?.version) {
+              this.selectedVersion = this.repoVersions[0].version;
+              this.$emit('update:selectedVersion', this.selectedVersion);
+              return true;
+            }
+          }
+        }
+        return false;
+      } catch (error) {
+        console.error('Error checking repo versions:', error);
+        return false;
+      }
+    },
+
+    async loadRepoVersions(clusterId: string): Promise<void> {
+      this.loadingRepos = true;
+
+      try {
+        const success = await this.checkAndLoadRepoVersions(clusterId);
+        if (!success) {
+          this.installError = 'No valid versions found';
+        }
+      } finally {
+        this.loadingRepos = false;
+      }
+    },
+
     onVersionSelected(value: string): void {
+      this.selectedVersion = value;
       this.$emit('update:selectedVersion', value);
     },
 
@@ -137,6 +228,7 @@ export default defineComponent({
           },
           credentials: 'same-origin'
         });
+
 
         if (!response.ok) {
           throw new Error(`Failed to fetch cluster repos: ${response.statusText}`);
@@ -191,7 +283,12 @@ export default defineComponent({
           const errorData = await response.json();
           throw new Error(errorData.message || `Failed to install Loft chart: ${response.statusText}`);
         }
+
         this.isLoftInstalled = true;
+
+        // Start polling for versions after successful installation
+        this.startPollingForVersions(clusterId);
+
         return true;
       } catch (error) {
         console.error(`Error installing Loft chart on cluster ${clusterId}:`, error);
@@ -202,9 +299,36 @@ export default defineComponent({
       }
     },
 
+    startPollingForVersions(clusterId: string): void {
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+      }
+
+      this.loadingRepos = true;
+      this.currentPollingAttempt = 0;
+
+      this.pollingInterval = window.setInterval(async () => {
+        this.currentPollingAttempt++;
+
+        if (this.currentPollingAttempt >= this.maxPollingAttempts) {
+          clearInterval(this.pollingInterval!);
+          this.pollingInterval = null;
+          this.loadingRepos = false;
+          this.installError = 'Timeout waiting for chart versions to become available';
+          return;
+        }
+
+        const success = await this.checkAndLoadRepoVersions(clusterId);
+        if (success) {
+          clearInterval(this.pollingInterval!);
+          this.pollingInterval = null;
+          this.loadingRepos = false;
+        }
+      }, 5000); // Poll every 5 seconds
+    },
+
     navigateToClusterRepos(clusterId: string): void {
-      // Navigate to the cluster repos page
-      this.$router.push(`/c/${clusterId}/apps/repositories`);
+      this.$router.push(`/c/${clusterId}/apps/catalog.cattle.io.clusterrepo`);
       this.closeModal(false);
     }
   }
@@ -265,8 +389,8 @@ export default defineComponent({
         >
           <div class="message-box">
             <p>
-              To create a virtual cluster, the vCluster chart repository must be
-              installed on the host cluster.
+              To create a virtual cluster, the vCluster Helm chart repository
+              must be added to this cluster first.
             </p>
 
             <div v-if="installError" class="error-message">
@@ -277,20 +401,18 @@ export default defineComponent({
               <AsyncButton
                 :disabled="installingLoftChart"
                 :loading="installingLoftChart"
-                :actionLabel="'Install vCluster chart'"
-                :waitingLabel="'Installing vCluster chart...'"
+                :actionLabel="'Add vCluster Helm Chart Repository'"
+                :waitingLabel="'Adding vCluster chart repository...'"
                 mode="edit"
                 class="btn btn-sm role-primary"
                 @click="() => installLoftChart(selectedClusterId)"
-              >
-                Install Automatically
-              </AsyncButton>
+              />
 
               <button
                 class="btn btn-sm role-secondary"
                 @click="navigateToClusterRepos(selectedClusterId)"
               >
-                Install Manually
+                Add Helm Chart Repository Manually
               </button>
             </div>
           </div>
@@ -302,10 +424,18 @@ export default defineComponent({
         >
           <div class="form-field">
             <label class="form-label">vCluster Version:</label>
+            <div v-if="loadingRepos" class="loading-message">
+              <span class="spinner"></span>
+              <span>Loading available versions...</span>
+            </div>
+            <div v-if="installError" class="error-message">
+              {{ installError }}
+            </div>
             <Select
-              :options="versionOptions"
+              v-if="!loadingRepos"
+              :options="computedVersionOptions"
               :value="selectedVersion"
-              :disabled="loadingRepos"
+              :disabled="loadingRepos || computedVersionOptions.length === 0"
               :searchable="true"
               placeholder="Select a version"
               @update:value="onVersionSelected"
@@ -316,9 +446,6 @@ export default defineComponent({
                 </div>
               </template>
             </Select>
-            <div v-if="loadingRepos" class="loading-message">
-              Loading versions...
-            </div>
           </div>
         </div>
       </div>
@@ -373,9 +500,28 @@ export default defineComponent({
 }
 
 .loading-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 5px;
   color: var(--muted);
   font-style: italic;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .error-message {
