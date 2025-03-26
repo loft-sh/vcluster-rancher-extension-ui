@@ -19,21 +19,16 @@ export function setupButtonInjector() {
         copiedButton.classList.add("btn", "btn-sm", "role-primary");
         copiedButton.setAttribute("data-testid", "vcluster-create-button");
         copiedButton.setAttribute("href", "/vCluster/c/_/dashboard");
-        copiedButton.setAttribute("style", "margin-left: 10px;");
+        copiedButton.setAttribute(
+          "style",
+          "margin-left: 10px;background-color: rgb(255, 102, 0)",
+        );
         copiedButton.textContent = "Create vCluster";
 
         copiedButton.addEventListener("click", (e) => {
           e.preventDefault();
           window.location.href = "/vCluster/c/_/dashboard";
         });
-
-        const vclusterLogo = document.createElement("img");
-        vclusterLogo.src = require("./assets/vclusterLogo.svg");
-        vclusterLogo.setAttribute("style", "margin-right: 5px;");
-        vclusterLogo.setAttribute("width", "20");
-        vclusterLogo.setAttribute("height", "20");
-
-        copiedButton.insertBefore(vclusterLogo, copiedButton.firstChild);
 
         const parent = button.parentElement;
         if (parent) {

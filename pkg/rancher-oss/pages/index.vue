@@ -118,10 +118,6 @@ export default defineComponent({
     combinedRows() {
       // Normalize cluster data
       const clusterRows = this.vClusters.map(cluster => {
-        console.log(cluster)
-
-
-
         const linkId = cluster.id.split('/').pop()
         const id = linkId?.split('-').pop()
 

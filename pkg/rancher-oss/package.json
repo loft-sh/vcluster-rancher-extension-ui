@@ -3,6 +3,7 @@
   "description": "vCluster Rancher Extension UI",
   "version": "0.0.1",
   "private": false,
+  "icon": "https://www.vcluster.com/docs/media/rebranding/vCluster_horizontal-orange.svg",
   "rancher": {
     "annotations": {
       "catalog.cattle.io/rancher-version": ">= 2.10.0",
