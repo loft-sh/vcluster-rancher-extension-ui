@@ -13,7 +13,7 @@ import AsyncButton from '@shell/components/AsyncButton.vue';
 import VClusterCreateModal from '../components/VclusterCreateModal.vue';
 import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
-import { LOFT_CHART_URL } from '../constants';
+import { LOFT_CHART_URL, RANCHER_CONSTANTS } from '../constants';
 import { allHash } from '@shell/utils/promise';
 
 
@@ -225,9 +225,9 @@ export default defineComponent({
   },
 
   mounted() {
-    document.body.classList.add('vcluster-page-active');
+    document.body.classList.add(RANCHER_CONSTANTS.VCLUSTER_PAGE_ACTIVE_CLASS_NAME);
 
-    const mainLayout = document.querySelector('.main-layout');
+    const mainLayout = document.querySelector(`.${RANCHER_CONSTANTS.MAIN_LAYOUT_CLASS_NAME}`);
     if (mainLayout instanceof HTMLElement) {
       this.originalStyles.set(mainLayout, mainLayout.style.cssText);
       mainLayout.style.gridArea = 'auto';
@@ -236,7 +236,7 @@ export default defineComponent({
       mainLayout.style.width = '100%';
     }
 
-    const nav = document.querySelector('.side-nav');
+    const nav = document.querySelector(`.${RANCHER_CONSTANTS.SIDE_NAV_CLASS_NAME}`);
     if (nav instanceof HTMLElement) {
       this.originalStyles.set(nav, nav.style.display);
       nav.style.display = 'none';
@@ -358,11 +358,11 @@ export default defineComponent({
 
       // we need to filter the ones that have : "loft.sh/vcluster-project-uid" and "loft.sh/vcluster-service-uid".
       const filteredClusters = mgmtClusters.filter((cluster: ClusterResource) => {
-        return cluster.metadata?.labels?.['loft.sh/vcluster-project-uid'] && cluster.metadata?.labels?.['loft.sh/vcluster-service-uid']
+        return cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_PROJECT_LABEL] && cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_SERVICE_LABEL]
       })
 
       const noVClusters = mgmtClusters.filter((cluster: ClusterResource) => {
-        return !cluster.metadata?.labels?.['loft.sh/vcluster-project-uid'] && !cluster.metadata?.labels?.['loft.sh/vcluster-service-uid']
+        return !cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_PROJECT_LABEL] && !cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_SERVICE_LABEL]
       })
 
 

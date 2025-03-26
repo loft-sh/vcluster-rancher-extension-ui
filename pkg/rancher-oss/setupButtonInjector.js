@@ -8,10 +8,6 @@ export function setupButtonInjector() {
       '[data-testid="vcluster-create-button"]',
     );
 
-    if (existingVClusterButton) {
-      return true;
-    }
-
     if (button && !existingVClusterButton) {
       const copiedButton = button.cloneNode(true);
 

@@ -17,7 +17,5 @@ export default function (plugin: IPlugin): void {
     { component: () => import("./components/VClusterClusterCreateItem.vue") },
   );
 
-  setTimeout(() => {
-    setupButtonInjector();
-  }, 1000);
+  setupButtonInjector();
 }
