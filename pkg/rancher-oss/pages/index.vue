@@ -119,10 +119,9 @@ export default defineComponent({
       // Normalize cluster data
       const clusterRows = this.vClusters.map(cluster => {
         const linkId = cluster.id.split('/').pop()
-        const id = linkId?.split('-').pop()
 
         return {
-          id: id,
+          id: linkId,
           name: cluster.nameDisplay,
           linkTo: `/c/_/manager/provisioning.cattle.io.cluster/${cluster.id}#node-pools`,
           description: cluster.spec?.description || '',
@@ -342,11 +341,11 @@ export default defineComponent({
       }
       if (cluster.isReady) {
         return 'bg-success';
-      } else if (cluster.status.state === 'Provisioning' || cluster.status.state === 'Updating' || cluster.status.state?.name === 'pending-install') {
+      } else if (cluster?.status && (cluster.status.state === 'Provisioning' || cluster.status.state === 'Updating' || cluster.status.state?.name === 'pending-install')) {
         return 'bg-info';
-      } else if (cluster.status.state === 'Failed' || cluster.status.state === 'Error') {
+      } else if (cluster?.status && (cluster.status.state === 'Failed' || cluster.status.state === 'Error')) {
         return 'bg-error';
-      } else if (cluster.status.state === "unavailable") {
+      } else if (cluster?.status && cluster.status.state === "unavailable") {
         return 'bg-neutral';
       } else {
         return 'bg-warning';
@@ -364,7 +363,6 @@ export default defineComponent({
       const noVClusters = mgmtClusters.filter((cluster: ClusterResource) => {
         return !cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_PROJECT_LABEL] && !cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_SERVICE_LABEL]
       })
-
 
       this.clusters = [...noVClusters];
       this.vClusters = [...filteredClusters];
@@ -407,7 +405,7 @@ export default defineComponent({
 
       if (cluster.isReady) {
         return 'Ready';
-      } else if (cluster.status.state) {
+      } else if (cluster?.status && cluster.status.state) {
         return cluster.status.state;
       } else {
         return 'Unknown';
@@ -526,9 +524,6 @@ export default defineComponent({
                   </p>
                   <p v-if="row.description" class="cluster-description">
                     {{ row.description }}
-                  </p>
-                  <p v-if="row.state" class="cluster-description">
-                    {{ row.state }}
                   </p>
                 </div>
               </td>

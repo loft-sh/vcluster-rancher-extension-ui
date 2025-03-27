@@ -5,7 +5,7 @@ import AsyncButton from '@shell/components/AsyncButton.vue';
 import AppModal from '@shell/components/AppModal.vue';
 import { CATALOG, MANAGEMENT } from '@shell/config/types';
 import { Store } from 'vuex';
-import { LOFT_CHART_URL } from '../constants';
+import { LOFT_CHART_URL, PRODUCT_NAME } from '../constants';
 import { getCookie } from '../utils';
 
 
@@ -216,7 +216,11 @@ export default defineComponent({
     },
 
     handleCreate(callback: (ok: boolean) => void): void {
-      this.$emit('create', callback);
+      this.$router.push({
+        path: `/${PRODUCT_NAME}/c/${this.selectedClusterId}/create`,
+        query: { version: this.selectedVersion }
+      });
+      this.closeModal(true);
     },
 
 
