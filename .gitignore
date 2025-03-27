@@ -134,3 +134,11 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+
+charts
+dist-pkg
+extensions
+assets
+./assets
+tmp

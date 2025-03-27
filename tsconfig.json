@@ -2,12 +2,9 @@
   "compilerOptions": {
     "target": "ES2018",
     "module": "ESNext",
+    "skipLibCheck": true,
     "moduleResolution": "Node",
-    "lib": [
-      "ESNext",
-      "ESNext.AsyncIterable",
-      "DOM"
-    ],
+    "lib": ["ESNext", "ESNext.AsyncIterable", "DOM"],
     "esModuleInterop": true,
     "allowJs": true,
     "sourceMap": false,
@@ -15,28 +12,13 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "~/*": [
-        "./*"
-      ],
-      "@/*": [
-        "./*"
-      ],
-      "@shell/*": [
-        "./node_modules/@rancher/shell/*"
-      ]
+      "~/*": ["./*"],
+      "@/*": ["./*"],
+      "@shell/*": ["./node_modules/@rancher/shell/*"]
     },
-    "typeRoots": [
-      "./node_modules",
-      "./node_modules/@rancher/shell/types"
-    ],
-    "types": [
-      "@types/node",
-      "cypress",
-      "rancher",
-      "shell"
-    ]
+    "typeRoots": ["./node_modules", "./node_modules/@rancher/shell/types"],
+    "types": ["@types/node", "cypress", "rancher", "shell"]
   },
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["**/*.ts", "**/*.d.ts", "**/*.tsx", "**/*.vue", "shims.vue.d.ts"],
+  "exclude": ["node_modules"]
 }

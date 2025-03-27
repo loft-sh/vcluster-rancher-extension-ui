@@ -1,0 +1,24 @@
+apiVersion: v1
+entries:
+  vcluster-rancher-extension-ui:
+  - annotations:
+      catalog.cattle.io/certified: rancher
+      catalog.cattle.io/namespace: cattle-ui-plugin-system
+      catalog.cattle.io/os: linux
+      catalog.cattle.io/permits-os: linux, windows
+      catalog.cattle.io/rancher-version: '>= 2.10.0'
+      catalog.cattle.io/scope: management
+      catalog.cattle.io/ui-component: plugins
+      catalog.cattle.io/ui-extensions-version: '>= 3.0.0 < 4.0.0'
+    apiVersion: v2
+    appVersion: 0.0.1
+    created: "2025-03-28T09:45:58.01902+02:00"
+    description: vCluster Rancher Extension UI
+    digest: 732ca6cd87be65ee519df0def306d2340acc0d992537f42bff31a25f049c8a89
+    icon: https://www.vcluster.com/docs/media/rebranding/vCluster_horizontal-orange.svg
+    name: vcluster-rancher-extension-ui
+    type: application
+    urls:
+    - assets/vcluster-rancher-extension-ui/vcluster-rancher-extension-ui-0.0.1.tgz
+    version: 0.0.1
+generated: "2025-03-28T09:45:58.018286+02:00"
