@@ -78,10 +78,15 @@ export default defineComponent({
       },
       isNewNamespace: false,
       selectedProjectId: null,
-      yamlValue: `sync:
+      yamlValue: `
+sync:
   toHost:
     ingresses:
       enabled: true
+controlPlane:
+  service:
+    annotations:
+      "loft.sh/uninstall-on-cluster-delete": "true"
 `
     };
   },
