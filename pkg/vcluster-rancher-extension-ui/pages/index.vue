@@ -15,6 +15,7 @@ import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
 import { LOFT_CHART_URL, RANCHER_CONSTANTS } from '../constants';
 import { allHash } from '@shell/utils/promise';
+import { areUrlsEquivalent } from '../utils';
 
 
 declare module 'vue/types/vue' {
@@ -260,7 +261,7 @@ export default defineComponent({
       try {
         const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER);
         const readyClusters = mgmtClusters.filter((cluster: ClusterResource) => cluster.isReady);
-        const loftRepo = this.$store.getters['management/all'](CATALOG.CLUSTER_REPO)?.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
+        const loftRepo = this.$store.getters['management/all'](CATALOG.CLUSTER_REPO)?.find((repo: { spec: { url: string } }) => areUrlsEquivalent(repo.spec.url, LOFT_CHART_URL));
 
         for (const cluster of readyClusters) {
           try {
@@ -418,6 +419,7 @@ export default defineComponent({
 
     closeCreateDialog(result: boolean) {
       this.showCreateDialog = false;
+      this.selectedClusterId = '';
     },
 
     handleCreateDialogOkay(callback: (ok: boolean) => void) {

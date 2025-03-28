@@ -6,7 +6,7 @@ import AppModal from '@shell/components/AppModal.vue';
 import { CATALOG, MANAGEMENT } from '@shell/config/types';
 import { Store } from 'vuex';
 import { LOFT_CHART_URL, PRODUCT_NAME } from '../constants';
-import { getCookie } from '../utils';
+import { areUrlsEquivalent, getCookie } from '../utils';
 
 
 declare module 'vue/types/vue' {
@@ -157,7 +157,7 @@ export default defineComponent({
           }
         });
 
-        const loftRepo = allRepos.find((repo: any) => repo.spec.url === LOFT_CHART_URL);
+        const loftRepo = allRepos.find((repo: any) => areUrlsEquivalent(repo.spec.url, LOFT_CHART_URL));
 
         if (loftRepo) {
           const indexResponse = await loftRepo.followLink('index');
@@ -212,7 +212,15 @@ export default defineComponent({
     },
 
     closeModal(result: boolean): void {
+      this.selectedVersion = '';
+      this.isLoftInstalled = false;
+      this.checkingLoftInstallation = false;
+      this.installingLoftChart = false;
+      this.installError = '';
+      this.repoVersions = [];
+
       this.$emit('close', result);
+
     },
 
     handleCreate(callback: (ok: boolean) => void): void {
@@ -220,6 +228,14 @@ export default defineComponent({
         path: `/${PRODUCT_NAME}/c/${this.selectedClusterId}/create`,
         query: { version: this.selectedVersion }
       });
+      // revert all values
+      this.selectedVersion = '';
+      this.isLoftInstalled = false;
+      this.checkingLoftInstallation = false;
+      this.installingLoftChart = false;
+      this.installError = '';
+      this.repoVersions = [];
+
       this.closeModal(true);
     },
 
@@ -245,7 +261,7 @@ export default defineComponent({
             }
           }[]
         };
-        const isLoftChartInstalled = data.data.some((repo) => repo.spec.url === LOFT_CHART_URL);
+        const isLoftChartInstalled = data.data.some((repo) => areUrlsEquivalent(repo.spec.url, LOFT_CHART_URL));
 
         return isLoftChartInstalled;
       } catch (error) {

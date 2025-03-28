@@ -15,6 +15,7 @@ import jsyaml from 'js-yaml';
 
 import { CATALOG, NAMESPACE } from '@shell/config/types';
 import { LOFT_CHART_URL, PRODUCT_NAME } from '../constants';
+import { areUrlsEquivalent } from '../utils';
 
 declare module 'vue/types/vue' {
   interface Vue {
@@ -87,6 +88,19 @@ controlPlane:
   service:
     annotations:
       "loft.sh/uninstall-on-cluster-delete": "true"
+rbac:
+  role:
+    enabled: true
+    overwriteRules:
+      - apiGroups: [""]
+        resources: ["configmaps", "secrets", "services", "pods", "pods/attach", "pods/portforward", "pods/exec", "persistentvolumeclaims"]
+        verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
+      - apiGroups: ["apps"]
+        resources: ["statefulsets", "replicasets", "deployments"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: [""]
+        resources: ["endpoints", "events", "pods/log"]
+        verbs: ["get", "list", "watch"]
 `
     };
   },
@@ -128,7 +142,7 @@ controlPlane:
           type: CATALOG.CLUSTER_REPO
         });
 
-        const loftRepo = allRepos.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
+        const loftRepo = allRepos.find((repo: { spec: { url: string } }) => areUrlsEquivalent(repo.spec.url, LOFT_CHART_URL));
         const response = await fetch(`/v1/catalog.cattle.io.clusterrepos/${loftRepo.id}?link=info&chartName=vcluster&version=${this.versionParam}`, {
           headers: {
             'Accept': 'application/json'
@@ -172,7 +186,7 @@ controlPlane:
       const chartName = "vcluster"
       const version = this.$route.query.version
       const inStore = this.$store.getters['currentStore']();
-      const loftRepo = this.$store.getters['management/all'](CATALOG.CLUSTER_REPO)?.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
+      const loftRepo = this.$store.getters['management/all'](CATALOG.CLUSTER_REPO)?.find((repo: { spec: { url: string } }) => areUrlsEquivalent(repo.spec.url, LOFT_CHART_URL));
 
       if (!loftRepo) {
         cb(false);
@@ -382,6 +396,11 @@ controlPlane:
   height: 300px;
   border: 1px solid var(--border);
   border-radius: 4px;
+  overflow: scroll;
+}
+
+.vcluster-yaml-editor .code-mirror {
+  overflow: scroll;
 }
 
 .vcluster-actions {
