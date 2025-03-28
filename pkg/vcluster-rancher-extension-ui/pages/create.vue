@@ -90,6 +90,7 @@ controlPlane:
       "loft.sh/uninstall-on-cluster-delete": "true"
 rbac:
   role:
+    enabled: true
     overwriteRules:
       - apiGroups: [""]
         resources: ["configmaps", "secrets", "services", "pods", "pods/attach", "pods/portforward", "pods/exec", "persistentvolumeclaims"]
@@ -395,6 +396,11 @@ rbac:
   height: 300px;
   border: 1px solid var(--border);
   border-radius: 4px;
+  overflow: scroll;
+}
+
+.vcluster-yaml-editor .code-mirror {
+  overflow: scroll;
 }
 
 .vcluster-actions {
