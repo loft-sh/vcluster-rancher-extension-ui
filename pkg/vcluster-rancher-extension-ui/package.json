@@ -1,16 +1,21 @@
 {
   "name": "vcluster-rancher-extension-ui",
   "description": "vCluster Rancher Extension UI",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": false,
   "icon": "https://www.vcluster.com/docs/media/rebranding/vCluster_horizontal-orange.svg",
   "rancher": {
     "annotations": {
       "catalog.cattle.io/rancher-version": ">= 2.10.0",
-      "catalog.cattle.io/ui-extensions-version": ">= 3.0.0 < 4.0.0"
+      "catalog.cattle.io/ui-extensions-version": ">= 3.0.0 < 4.0.0",
+      "catalog.cattle.io/display-name": "vCluster Rancher Extension UI"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "bump-patch": "npm version patch",
+    "bump-minor": "npm version minor",
+    "bump-major": "npm version major"
+  },
   "engines": {
     "node": ">=16"
   },
