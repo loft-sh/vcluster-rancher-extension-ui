@@ -2,15 +2,12 @@ const baseConfig = require("./.shell/pkg/vue.config")(__dirname);
 
 module.exports = {
   ...baseConfig,
-
-  // If baseConfig already has chainWebpack, we must wrap it
   chainWebpack: (config) => {
-    // Call the base config's chainWebpack first (if it exists)
     if (typeof baseConfig.chainWebpack === "function") {
       baseConfig.chainWebpack(config);
     }
 
-    // Then delete the Fork TS checker plugin
+    // DISABLE TS CHECKER for builds because it's blocking it, due to module resolution between our app and @shell/rancher
     config.plugins.delete("fork-ts-checker");
   },
 };
