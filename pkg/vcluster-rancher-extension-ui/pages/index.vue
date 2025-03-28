@@ -211,10 +211,11 @@ export default defineComponent({
           label: '-- Select a Cluster --',
           value: '',
         },
-        ...mgmtClusters.map(cluster => ({
+        ...mgmtClusters
+          .filter((cluster) => cluster.isReady)
+        .map(cluster => ({
           label: `${cluster.nameDisplay} ${!cluster.isReady ? `(${this.getClusterStatusLabel(cluster)})` : ''}`,
           value: cluster.id,
-          disabled: !cluster.isReady
         }))
       ];
     }
