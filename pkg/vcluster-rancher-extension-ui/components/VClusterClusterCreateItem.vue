@@ -4,6 +4,7 @@ import { PRODUCT_NAME, LOFT_CHART_URL } from '../constants';
 import VClusterCreateModal from './VclusterCreateModal.vue';
 import { Store } from 'vuex';
 import { CATALOG } from '@shell/config/types';
+import { areUrlsEquivalent } from '../utils';
 
 export default {
   name: 'VClusterClusterCreateItem',
@@ -82,7 +83,7 @@ export default {
         type: CATALOG.CLUSTER_REPO
       });
 
-      const loftRepo = allRepos.find((repo: { spec: { url: string } }) => repo.spec.url === LOFT_CHART_URL);
+      const loftRepo = allRepos.find((repo: { spec: { url: string } }) => areUrlsEquivalent(repo.spec.url, LOFT_CHART_URL));
 
       if (loftRepo) {
         const indexResponse = await loftRepo.followLink('index');
