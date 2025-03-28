@@ -6,14 +6,25 @@
 
 ## Installation
 
-1. Go to your main cluster repos page `/c/{CLUSTER_ID}/apps/catalog.cattle.io.clusterrepo`
-2. Click on `Create`
-3. Add a unique name, we recommend `loft`
-4. Add the following URL to the repo: `https://charts.loft.sh`
-5. Click on `Create`
-6. Click on `Extensions` on the left sidebar
-7. Under the `Available` tab, you should see `vCluster Rancher Extension UI`
-8. Click on `Install`
+1. In the Rancher UI, click on the Extensions in the left side menu. Click on the ellipsis menu on the top right and select Manage Repositories.
+2. Click on Create on the right. Give the repository a name and enter https://charts.loft.sh/ as the Index URL.
+3. Click on Create at the bottom.
+4. Navigate back to the Extensions page and click on Available tab. Click Install on the extension named `vCluster Rancher Extension UI`.
+
+## Using the extension
+
+1. There are multiple ways to create a vCluster from the Rancher UI :
+   - Rancher homepage -> Create vCluster
+   - Rancher Cluster management page --> Create cluster
+   - vCluster List page left side menu --> Create vCluster
+2. From the dropdown menu, choose the host cluster where you'd like to deploy your virtual cluster.
+3. If the charts.loft.sh repository isn't already configured on your selected cluster, you'll be given the option to add it automatically or manually.
+   - If you choose to add it manually, click on Create on the right. Give the repository a name and enter https://charts.loft.sh/ as the Index URL.
+4. Select your preferred vCluster version from the available options.
+5. Specify a namespace and name for your virtual cluster, then click `Create vCluster` to begin the deployment.
+6. Select vCluster List page left side menu to view the created vCluster
+7. The vCluster should show up as a regular downstream cluster in Rancher and be available in the left side menu
+8. Click on the vCluster to navigate to Cluster explorer page to use the cluster.
 
 ## Development
 

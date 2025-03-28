@@ -9,14 +9,3 @@ declare module "@rancher/shell/*" {
   const anything: any;
   export default anything;
 }
-
-// Example Vue augmentation (optional):
-import { ComponentCustomProperties } from "vue";
-declare module "@vue/runtime-core" {
-  interface ComponentCustomProperties {
-    $store: any;
-    $router: any;
-    $route: any;
-    // etc...
-  }
-}
