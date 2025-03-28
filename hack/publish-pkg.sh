@@ -87,3 +87,7 @@ yarn publish-pkgs vcluster-rancher-extension-ui
 # Get version from package.json
 VERSION=$(node -p "require('./pkg/vcluster-rancher-extension-ui/package.json').version")
 echo "Package version: $VERSION"
+
+helm plugin install https://github.com/chartmuseum/helm-push.git
+helm repo add chartmuseum https://charts.loft.sh --username $USERNAME --password $PASSWORD
+helm cm-push --force charts/vcluster-rancher-extension-ui/0.1.0/ chartmuseum
