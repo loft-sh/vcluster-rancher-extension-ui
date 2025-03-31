@@ -58,7 +58,7 @@ interface AppResource {
   type?: string;
 }
 
-interface ProjectResource {
+export interface ProjectResource {
   id: string;
   name: string;
   spec: {
@@ -99,6 +99,7 @@ export default defineComponent({
       loading: false,
       showCreateDialog: false,
       projects: [] as ProjectResource[],
+      pollingInterval: null as number | null,
       tableHeaders: [
         {
           name: 'status',
@@ -212,19 +213,19 @@ export default defineComponent({
 
 
 
-    clusterOptions(): { label: string; value: string; disabled?: boolean }[] {
-      const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[]
+    clusterOptions(): { label: string; value: string; disabled?: boolean; tooltip?: string }[] {
+      const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[];
 
+      // Separate ready clusters into those with and without projects
+      const readyClusters = mgmtClusters.filter(cluster => cluster.isReady);
+      const clustersWithProjects = readyClusters.filter(cluster =>
+        this.projects.some(project => project.spec.clusterName === cluster.id)
+      );
+      const readyClustersWithoutProjects = readyClusters.filter(cluster =>
+        !this.projects.some(project => project.spec.clusterName === cluster.id)
+      );
 
-      console.log(mgmtClusters);
-
-      const clustersWithProjects = mgmtClusters.filter((cluster) => {
-        const isReady = cluster.isReady;
-        const hasProject = this.projects.some(project => project.spec.clusterName === cluster.id);
-        return isReady && hasProject;
-      });
-
-      if (clustersWithProjects.length === 0) {
+      if (readyClusters.length === 0) {
         return [];
       }
 
@@ -234,8 +235,14 @@ export default defineComponent({
           value: '',
         },
         ...clustersWithProjects.map(cluster => ({
-          label: `${cluster.nameDisplay} ${!cluster.isReady ? `(${this.getClusterStatusLabel(cluster)})` : ''}`,
+          label: cluster.nameDisplay,
           value: cluster.id,
+        })),
+        ...readyClustersWithoutProjects.map(cluster => ({
+          label: cluster.nameDisplay,
+          value: cluster.id,
+          disabled: true,
+          tooltip: 'No projects available for this cluster'
         }))
       ];
     }
@@ -263,8 +270,17 @@ export default defineComponent({
       nav.style.display = 'none';
     }
 
+    // Initial load
     this.loadAllProjects();
     this.loadFailedInstallations();
+    this.loadClusters();
+
+    // Set up polling interval
+    this.pollingInterval = window.setInterval(async () => {
+      await Promise.all([
+        this.loadClusters()
+      ]);
+    }, 5000);
   },
 
   methods: {
@@ -317,6 +333,14 @@ export default defineComponent({
               const isFailed = app.spec?.info?.status === 'failed';
               const isPending = app.metadata?.state?.name === 'pending-install';
               return isLoftApp && (isFailed || isPending);
+            }).filter((app: AppResource) => {
+              // make sure you don't include an app that has the same name as a cluster
+              const isCluster = this.vClusters.some((c: ClusterResource) => {
+                const appId = `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`
+                const linkId = c?.id?.split('/').pop()
+                return appId === linkId
+              });
+              return !isCluster;
             });
 
             clusterFailedApps.forEach((app: AppResource) => {
@@ -390,7 +414,7 @@ export default defineComponent({
 
     async loadClusters(): Promise<void> {
       const mgmtClusters: ClusterResource[] = await this.$store.dispatch('management/findAll', { type: CAPI.RANCHER_CLUSTER })
-      const mgmtClustersManagement = await this.$store.dispatch('management/findAll', { type: MANAGEMENT.CLUSTER })
+      const mgmtClustersManagement = await this.$store.dispatch('management/findAll', { type: MANAGEMENT.CLUSTER }) || []
 
 
       // we need to filter the ones that have : "loft.sh/vcluster-project-uid" and "loft.sh/vcluster-service-uid".
@@ -402,10 +426,8 @@ export default defineComponent({
           return c.id === hostCluster
         })
 
-        console.log(mgmtCluster, 'mgmtCluster');
-        console.log(cluster, 'cluster');
         return {
-          ...mgmtCluster,
+          ...(mgmtCluster || {}),
           ...cluster,
         }
       })
@@ -416,9 +438,6 @@ export default defineComponent({
 
       this.clusters = [...noVClusters];
       this.vClusters = [...filteredClusters];
-
-
-      console.log(this.vClusters, 'vClusters');
 
       this.clusters.sort((a, b) => {
         return (a.nameDisplay || '').localeCompare(b.nameDisplay || '');
@@ -485,6 +504,12 @@ export default defineComponent({
 
   beforeUnmount() {
     document.body.classList.remove('vcluster-page-active');
+
+    // Clear polling interval
+    if (this.pollingInterval) {
+      window.clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
 
     const mainLayout = document.querySelector('.main-layout');
     if (mainLayout instanceof HTMLElement && this.originalStyles.has(mainLayout)) {

@@ -5,6 +5,8 @@ import VClusterCreateModal from './VclusterCreateModal.vue';
 import { Store } from 'vuex';
 import { CATALOG } from '@shell/config/types';
 import { areUrlsEquivalent } from '../utils';
+import { ProjectResource } from '../pages/index.vue';
+import { MANAGEMENT } from '@shell/config/types';
 
 export default {
   name: 'VClusterClusterCreateItem',
@@ -29,12 +31,13 @@ export default {
   data() {
     return {
       showModal: false,
-      clusterOptions: [],
+      clusterOptions: [] as { label: string, value: string, disabled?: boolean, tooltip?: string }[],
       versionOptions: [] as { label: string, value: string }[],
       selectedClusterId: '',
       selectedVersion: '',
       loading: false,
-      loadingRepos: false
+      loadingRepos: false,
+      projects: [] as ProjectResource[]
     };
   },
 
@@ -43,6 +46,7 @@ export default {
       this.showModal = true;
       this.fetchClusters();
       this.fetchVersions();
+      this.loadAllProjects();
     },
 
     closeModal() {
@@ -57,19 +61,49 @@ export default {
       this.selectedVersion = version;
     },
 
+    async loadAllProjects() {
+      try {
+        const projects = await this.$store.dispatch('management/findAll', {
+          type: MANAGEMENT.PROJECT,
+          opt: { force: true }
+        });
+        this.projects = projects;
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        this.projects = [];
+      }
+    },
+
     async fetchClusters() {
       this.loading = true;
       try {
         const inStore = this.$store.getters['currentStore']();
         const clusters = this.$store.getters[`${inStore}/all`]('management.cattle.io.cluster');
 
-        this.clusterOptions = clusters
-          .filter((cluster: ClusterResource) => cluster.isReady)
-          .map((cluster: ClusterResource) => ({
+        const readyClusters = clusters.filter((cluster: ClusterResource) => cluster.isReady);
+        const clustersWithProjects = readyClusters.filter((cluster: ClusterResource) =>
+          this.projects.some((project: ProjectResource) => project.spec.clusterName === cluster.id)
+        );
+        const readyClustersWithoutProjects = readyClusters.filter((cluster: ClusterResource) =>
+          !this.projects.some((project: ProjectResource) => project.spec.clusterName === cluster.id)
+        );
+
+        this.clusterOptions = [
+          {
+            label: '-- Select a Cluster --',
+            value: '',
+          },
+          ...clustersWithProjects.map((cluster: ClusterResource) => ({
             label: cluster.nameDisplay,
             value: cluster.id,
-            disabled: !cluster.isReady
-          }));
+          })),
+          ...readyClustersWithoutProjects.map((cluster: ClusterResource) => ({
+            label: cluster.nameDisplay,
+            value: cluster.id,
+            disabled: true,
+            tooltip: 'No projects available for this cluster'
+          }))
+        ] as { label: string, value: string, disabled?: boolean, tooltip?: string }[];
       } catch (error) {
         console.error('Error fetching clusters:', error);
       } finally {
