@@ -42,15 +42,22 @@ export default {
   },
 
   methods: {
-    openVClusterModal() {
+    async openVClusterModal() {
       this.showModal = true;
-      this.fetchClusters();
-      this.fetchVersions();
-      this.loadAllProjects();
+      try {
+        await this.loadAllProjects();
+        await this.fetchClusters();
+        await this.fetchVersions();
+      } catch (error) {
+        console.error('Error initializing vCluster modal data:', error);
+        this.closeModal();
+      }
     },
 
     closeModal() {
       this.showModal = false;
+      this.selectedClusterId = '';
+      this.selectedVersion = '';
     },
 
     onClusterSelected(clusterId: string) {
@@ -197,7 +204,7 @@ export default {
       :selected-version="selectedVersion"
       :loading="loading"
       :loading-repos="loadingRepos"
-      @close="closeModal"
+      :on-close="closeModal"
       @update:selectedClusterId="onClusterSelected"
       @update:selectedVersion="onVersionSelected"
       @create="handleCreate"
