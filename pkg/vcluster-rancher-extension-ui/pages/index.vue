@@ -268,15 +268,12 @@ export default defineComponent({
       nav.style.display = 'none';
     }
 
-    // Initial load - ensure projects are loaded first
     try {
       await this.loadAllProjects();
-      // Now load clusters and failed installations
-      this.loadClusters();
-      this.loadFailedInstallations();
+      await this.loadClusters();
+      await this.loadFailedInstallations();
     } catch (error) {
       console.error("Error during initial data load in mounted:", error);
-      // Handle potential errors during initial load
     }
 
     // Set up polling interval

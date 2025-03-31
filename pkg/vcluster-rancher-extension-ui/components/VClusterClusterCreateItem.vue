@@ -46,8 +46,8 @@ export default {
       this.showModal = true;
       try {
         await this.loadAllProjects();
-        this.fetchClusters();
-        this.fetchVersions();
+        await this.fetchClusters();
+        await this.fetchVersions();
       } catch (error) {
         console.error('Error initializing vCluster modal data:', error);
         this.closeModal();
