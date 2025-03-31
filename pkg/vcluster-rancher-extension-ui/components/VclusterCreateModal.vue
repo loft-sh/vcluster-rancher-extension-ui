@@ -216,7 +216,6 @@ export default defineComponent({
     },
 
     closeModal(result: boolean): void {
-      //  v-if="selectedClusterId && !checkingLoftInstallation && !isLoftInstalled"
 
       this.selectedVersion = '';
       this.isLoftInstalled = false;
@@ -235,7 +234,7 @@ export default defineComponent({
         path: `/${PRODUCT_NAME}/c/${this.selectedClusterId}/create`,
         query: { version: this.selectedVersion }
       });
-      // revert all values
+
       this.selectedVersion = '';
       this.isLoftInstalled = false;
       this.checkingLoftInstallation = false;

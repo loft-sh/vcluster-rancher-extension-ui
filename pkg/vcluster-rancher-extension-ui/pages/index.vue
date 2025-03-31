@@ -250,10 +250,6 @@ export default defineComponent({
     }
   },
 
-  created(): void {
-    // Remove loadClusters call from here
-  },
-
   async mounted() {
     document.body.classList.add(RANCHER_CONSTANTS.VCLUSTER_PAGE_ACTIVE_CLASS_NAME);
 
