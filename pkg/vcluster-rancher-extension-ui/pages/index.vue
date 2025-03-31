@@ -251,10 +251,10 @@ export default defineComponent({
   },
 
   created(): void {
-    this.loadClusters();
+    // Remove loadClusters call from here
   },
 
-  mounted() {
+  async mounted() {
     document.body.classList.add(RANCHER_CONSTANTS.VCLUSTER_PAGE_ACTIVE_CLASS_NAME);
 
     const mainLayout = document.querySelector(`.${RANCHER_CONSTANTS.MAIN_LAYOUT_CLASS_NAME}`);
@@ -272,10 +272,16 @@ export default defineComponent({
       nav.style.display = 'none';
     }
 
-    // Initial load
-    this.loadAllProjects();
-    this.loadFailedInstallations();
-    this.loadClusters();
+    // Initial load - ensure projects are loaded first
+    try {
+      await this.loadAllProjects();
+      // Now load clusters and failed installations
+      this.loadClusters();
+      this.loadFailedInstallations();
+    } catch (error) {
+      console.error("Error during initial data load in mounted:", error);
+      // Handle potential errors during initial load
+    }
 
     // Set up polling interval
     this.pollingInterval = window.setInterval(async () => {
@@ -639,7 +645,7 @@ export default defineComponent({
       :selected-cluster-id="selectedClusterId"
       :loading="loading"
       @update:selected-cluster-id="onClusterSelected"
-      @close="closeCreateDialog"
+      :on-close="closeCreateDialog"
       @create="handleCreateDialogOkay"
     />
 

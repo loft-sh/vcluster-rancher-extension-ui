@@ -69,10 +69,14 @@ export default defineComponent({
     loadingRepos: {
       type: Boolean,
       default: false
+    },
+    onClose: {
+      type: Function as PropType<(result: boolean) => void>,
+      required: true
     }
   },
 
-  emits: ['close', 'update:selectedClusterId', 'update:selectedVersion', 'create'],
+  emits: ['update:selectedClusterId', 'update:selectedVersion', 'create'],
 
   data() {
     return {
@@ -212,6 +216,8 @@ export default defineComponent({
     },
 
     closeModal(result: boolean): void {
+      //  v-if="selectedClusterId && !checkingLoftInstallation && !isLoftInstalled"
+
       this.selectedVersion = '';
       this.isLoftInstalled = false;
       this.checkingLoftInstallation = false;
@@ -219,8 +225,9 @@ export default defineComponent({
       this.installError = '';
       this.repoVersions = [];
 
-      this.$emit('close', result);
-
+      if (this.onClose) {
+        this.onClose(result);
+      }
     },
 
     handleCreate(callback: (ok: boolean) => void): void {
@@ -235,7 +242,6 @@ export default defineComponent({
       this.installingLoftChart = false;
       this.installError = '';
       this.repoVersions = [];
-
       this.closeModal(true);
     },
 
