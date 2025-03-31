@@ -89,19 +89,6 @@ controlPlane:
   service:
     annotations:
       "loft.sh/uninstall-on-cluster-delete": "true"
-rbac:
-  role:
-    enabled: true
-    overwriteRules:
-      - apiGroups: [""]
-        resources: ["configmaps", "secrets", "services", "pods", "pods/attach", "pods/portforward", "pods/exec", "persistentvolumeclaims"]
-        verbs: ["create", "delete", "patch", "update", "get", "list", "watch"]
-      - apiGroups: ["apps"]
-        resources: ["statefulsets", "replicasets", "deployments"]
-        verbs: ["get", "list", "watch"]
-      - apiGroups: [""]
-        resources: ["endpoints", "events", "pods/log"]
-        verbs: ["get", "list", "watch"]
 `
     };
   },
