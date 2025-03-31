@@ -58,6 +58,14 @@ interface AppResource {
   type?: string;
 }
 
+interface ProjectResource {
+  id: string;
+  name: string;
+  spec: {
+    clusterName: string;
+  };
+}
+
 export default defineComponent({
   name: 'vClusterList',
 
@@ -90,6 +98,7 @@ export default defineComponent({
       selectedClusterId: '',
       loading: false,
       showCreateDialog: false,
+      projects: [] as ProjectResource[],
       tableHeaders: [
         {
           name: 'status',
@@ -128,22 +137,19 @@ export default defineComponent({
           description: cluster.spec?.description || '',
           namespace: cluster.metadata?.namespace || '',
           status: {
-          state: cluster.state,
+            state: cluster.state,
+            isReady: cluster.isReady,
+            label: this.getClusterStatusLabel(cluster),
+            color: this.getStatusColor(cluster),
+          },
+          metadata: {
+            ...cluster.metadata
+          },
           isReady: cluster.isReady,
-          label: this.getClusterStatusLabel(cluster),
-          color: this.getStatusColor(cluster),
-        },
-        metadata: {
-          ...cluster.metadata
-        },
-        // Original data needed for other functions
-        isReady: cluster.isReady,
-        state: cluster.metadata?.state?.message || "",
-        // For grouping and identification
-        type: 'cluster',
-        sort: cluster.isReady ? 1 : 2,
-        group: 'active',
-          // Keep the original for any methods that need it
+          state: cluster.metadata?.state?.message || "",
+          type: 'cluster',
+          sort: cluster.isReady ? 1 : 2,
+          group: 'active',
           original: cluster
         }
       });
@@ -204,16 +210,30 @@ export default defineComponent({
         (this.selectedCluster && !this.selectedCluster.isReady);
     },
 
+
+
     clusterOptions(): { label: string; value: string; disabled?: boolean }[] {
       const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[]
+
+
+      console.log(mgmtClusters);
+
+      const clustersWithProjects = mgmtClusters.filter((cluster) => {
+        const isReady = cluster.isReady;
+        const hasProject = this.projects.some(project => project.spec.clusterName === cluster.id);
+        return isReady && hasProject;
+      });
+
+      if (clustersWithProjects.length === 0) {
+        return [];
+      }
+
       return [
         {
           label: '-- Select a Cluster --',
           value: '',
         },
-        ...mgmtClusters
-          .filter((cluster) => cluster.isReady)
-        .map(cluster => ({
+        ...clustersWithProjects.map(cluster => ({
           label: `${cluster.nameDisplay} ${!cluster.isReady ? `(${this.getClusterStatusLabel(cluster)})` : ''}`,
           value: cluster.id,
         }))
@@ -243,10 +263,24 @@ export default defineComponent({
       nav.style.display = 'none';
     }
 
+    this.loadAllProjects();
     this.loadFailedInstallations();
   },
 
   methods: {
+    async loadAllProjects() {
+      try {
+        const projects = await this.$store.dispatch('management/findAll', {
+          type: MANAGEMENT.PROJECT,
+          opt: { force: true }
+        });
+        this.projects = projects;
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        this.projects = [];
+      }
+    },
+
     async loadFailedInstallations() {
       try {
         this.failedInstallations = await this.fetchFailedVClusterApps();
@@ -291,8 +325,8 @@ export default defineComponent({
                 id: `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`,
                 clusterId: cluster.id,
                 clusterName: cluster.spec?.displayName || cluster.metadata?.name,
-                nameDisplay: app.metadata?.name, // Add this for combined table
-                state: app.spec?.info?.status || 'failed', // Add this for combined table
+                nameDisplay: app.metadata?.name,
+                state: app.spec?.info?.status || 'failed',
                 error: this.getAppErrorMessage(app),
                 metadata: {
                   name: app.metadata?.name,
@@ -356,10 +390,24 @@ export default defineComponent({
 
     async loadClusters(): Promise<void> {
       const mgmtClusters: ClusterResource[] = await this.$store.dispatch('management/findAll', { type: CAPI.RANCHER_CLUSTER })
+      const mgmtClustersManagement = await this.$store.dispatch('management/findAll', { type: MANAGEMENT.CLUSTER })
+
 
       // we need to filter the ones that have : "loft.sh/vcluster-project-uid" and "loft.sh/vcluster-service-uid".
       const filteredClusters = mgmtClusters.filter((cluster: ClusterResource) => {
         return cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_PROJECT_LABEL] && cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_SERVICE_LABEL]
+      }).map((cluster: ClusterResource) => {
+        const mgmtCluster = mgmtClustersManagement.find((c: ClusterResource) => {
+          const hostCluster = cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_HOST_CLUSTER_LABEL]
+          return c.id === hostCluster
+        })
+
+        console.log(mgmtCluster, 'mgmtCluster');
+        console.log(cluster, 'cluster');
+        return {
+          ...mgmtCluster,
+          ...cluster,
+        }
       })
 
       const noVClusters = mgmtClusters.filter((cluster: ClusterResource) => {
@@ -368,6 +416,9 @@ export default defineComponent({
 
       this.clusters = [...noVClusters];
       this.vClusters = [...filteredClusters];
+
+
+      console.log(this.vClusters, 'vClusters');
 
       this.clusters.sort((a, b) => {
         return (a.nameDisplay || '').localeCompare(b.nameDisplay || '');

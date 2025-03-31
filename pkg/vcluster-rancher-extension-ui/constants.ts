@@ -6,6 +6,7 @@ const RANCHER_CONSTANTS = {
   VCLUSTER_PAGE_ACTIVE_CLASS_NAME: "vcluster-page-active",
   VCLUSTER_PROJECT_LABEL: "loft.sh/vcluster-project-uid",
   VCLUSTER_SERVICE_LABEL: "loft.sh/vcluster-service-uid",
+  VCLUSTER_HOST_CLUSTER_LABEL: "loft.sh/vcluster-host-cluster",
 } as const;
 
 export { PRODUCT_NAME, LOFT_CHART_URL, RANCHER_CONSTANTS };

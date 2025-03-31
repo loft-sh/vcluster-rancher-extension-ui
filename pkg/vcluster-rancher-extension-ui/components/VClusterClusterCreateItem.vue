@@ -21,7 +21,8 @@ export default {
 
   computed: {
     isCreatePage(): boolean {
-      return this.$route.path.includes('/create');
+      const url = new URL(window.location.href)
+      return url.pathname.includes('/create') && !url.searchParams.has('mode')
     }
   },
 
