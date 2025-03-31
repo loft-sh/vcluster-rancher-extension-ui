@@ -102,6 +102,9 @@ rbac:
       - apiGroups: [""]
         resources: ["endpoints", "events", "pods/log"]
         verbs: ["get", "list", "watch"]
+      - apiGroups: ["networking.k8s.io"]
+        resources: ["ingresses"]
+        verbs: ["list", "watch"]
 `
     };
   },
