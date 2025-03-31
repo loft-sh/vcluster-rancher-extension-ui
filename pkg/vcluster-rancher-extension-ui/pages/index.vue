@@ -15,7 +15,7 @@ import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
 import { LOFT_CHART_URL, RANCHER_CONSTANTS } from '../constants';
 import { allHash } from '@shell/utils/promise';
-import { areUrlsEquivalent } from '../utils';
+import { areUrlsEquivalent, getClusterId } from '../utils';
 
 
 declare module 'vue/types/vue' {
@@ -29,7 +29,9 @@ export interface ClusterResource {
   id: string;
   nameDisplay: string;
   isReady?: boolean;
-  state?: string;
+  state?: {
+    name?: string;
+  };
   mgmt?: boolean;
   metadata: {
     name: string;
@@ -56,6 +58,14 @@ interface AppResource {
   state?: string;
   group?: string;
   type?: string;
+}
+
+export interface ProjectResource {
+  id: string;
+  name: string;
+  spec: {
+    clusterName: string;
+  };
 }
 
 export default defineComponent({
@@ -90,6 +100,8 @@ export default defineComponent({
       selectedClusterId: '',
       loading: false,
       showCreateDialog: false,
+      projects: [] as ProjectResource[],
+      pollingInterval: null as number | null,
       tableHeaders: [
         {
           name: 'status',
@@ -119,7 +131,8 @@ export default defineComponent({
     combinedRows() {
       // Normalize cluster data
       const clusterRows = this.vClusters.map(cluster => {
-        const linkId = cluster.id.split('/').pop()
+        const linkId = getClusterId(cluster)
+
 
         return {
           id: linkId,
@@ -128,22 +141,20 @@ export default defineComponent({
           description: cluster.spec?.description || '',
           namespace: cluster.metadata?.namespace || '',
           status: {
-          state: cluster.state,
+            state: cluster.state,
+            isReady: cluster.isReady,
+            label: this.getClusterStatusLabel(cluster),
+            color: this.getStatusColor(cluster),
+          },
+          metadata: {
+            ...cluster.metadata
+          },
           isReady: cluster.isReady,
-          label: this.getClusterStatusLabel(cluster),
-          color: this.getStatusColor(cluster),
-        },
-        metadata: {
-          ...cluster.metadata
-        },
-        // Original data needed for other functions
-        isReady: cluster.isReady,
-        state: cluster.metadata?.state?.message || "",
-        // For grouping and identification
-        type: 'cluster',
-        sort: cluster.isReady ? 1 : 2,
-        group: 'active',
-          // Keep the original for any methods that need it
+          state: cluster.metadata?.state || "",
+          stateMessage: cluster.metadata?.state?.message || "",
+          type: 'cluster',
+          sort: cluster.isReady ? 1 : 2,
+          group: 'active',
           original: cluster
         }
       });
@@ -204,19 +215,37 @@ export default defineComponent({
         (this.selectedCluster && !this.selectedCluster.isReady);
     },
 
-    clusterOptions(): { label: string; value: string; disabled?: boolean }[] {
-      const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[]
+
+
+    clusterOptions(): { label: string; value: string; disabled?: boolean; tooltip?: string }[] {
+      const clusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[];
+
+      const mappedOptions = clusters.filter((cluster: ClusterResource) => cluster.isReady).map((cluster: ClusterResource) => {
+        const hasProjects = this.projects.some((project: ProjectResource) =>
+          project.spec?.clusterName === cluster.id
+        );
+
+        if (hasProjects) {
+          return {
+            label: cluster.nameDisplay,
+            value: cluster.id,
+          };
+        } else {
+          return {
+            label: cluster.nameDisplay,
+            value: cluster.id,
+            disabled: true,
+            tooltip: 'No projects available for this cluster'
+          };
+        }
+      });
+
       return [
         {
           label: '-- Select a Cluster --',
           value: '',
         },
-        ...mgmtClusters
-          .filter((cluster) => cluster.isReady)
-        .map(cluster => ({
-          label: `${cluster.nameDisplay} ${!cluster.isReady ? `(${this.getClusterStatusLabel(cluster)})` : ''}`,
-          value: cluster.id,
-        }))
+        ...mappedOptions
       ];
     }
   },
@@ -243,10 +272,33 @@ export default defineComponent({
       nav.style.display = 'none';
     }
 
+    // Initial load
+    this.loadAllProjects();
     this.loadFailedInstallations();
+    this.loadClusters();
+
+    // Set up polling interval
+    this.pollingInterval = window.setInterval(async () => {
+      await Promise.all([
+        this.loadClusters()
+      ]);
+    }, 5000);
   },
 
   methods: {
+    async loadAllProjects() {
+      try {
+        const projects = await this.$store.dispatch('management/findAll', {
+          type: MANAGEMENT.PROJECT,
+          opt: { force: true }
+        });
+        this.projects = projects;
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+        this.projects = [];
+      }
+    },
+
     async loadFailedInstallations() {
       try {
         this.failedInstallations = await this.fetchFailedVClusterApps();
@@ -283,6 +335,14 @@ export default defineComponent({
               const isFailed = app.spec?.info?.status === 'failed';
               const isPending = app.metadata?.state?.name === 'pending-install';
               return isLoftApp && (isFailed || isPending);
+            }).filter((app: AppResource) => {
+              // make sure you don't include an app that has the same name as a cluster
+              const isCluster = this.vClusters.some((c: ClusterResource) => {
+                const appId = `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`
+                const linkId = getClusterId(c)
+                return appId === linkId
+              });
+              return !isCluster;
             });
 
             clusterFailedApps.forEach((app: AppResource) => {
@@ -291,8 +351,8 @@ export default defineComponent({
                 id: `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`,
                 clusterId: cluster.id,
                 clusterName: cluster.spec?.displayName || cluster.metadata?.name,
-                nameDisplay: app.metadata?.name, // Add this for combined table
-                state: app.spec?.info?.status || 'failed', // Add this for combined table
+                nameDisplay: app.metadata?.name,
+                state: app.spec?.info?.status || 'failed',
                 error: this.getAppErrorMessage(app),
                 metadata: {
                   name: app.metadata?.name,
@@ -356,10 +416,22 @@ export default defineComponent({
 
     async loadClusters(): Promise<void> {
       const mgmtClusters: ClusterResource[] = await this.$store.dispatch('management/findAll', { type: CAPI.RANCHER_CLUSTER })
+      const mgmtClustersManagement = await this.$store.dispatch('management/findAll', { type: MANAGEMENT.CLUSTER }) || []
+
 
       // we need to filter the ones that have : "loft.sh/vcluster-project-uid" and "loft.sh/vcluster-service-uid".
       const filteredClusters = mgmtClusters.filter((cluster: ClusterResource) => {
         return cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_PROJECT_LABEL] && cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_SERVICE_LABEL]
+      }).map((cluster: ClusterResource) => {
+        const mgmtCluster = mgmtClustersManagement.find((c: ClusterResource) => {
+          const hostCluster = cluster.metadata?.labels?.[RANCHER_CONSTANTS.VCLUSTER_HOST_CLUSTER_LABEL]
+          return c.id === hostCluster
+        })
+
+        return {
+          ...(mgmtCluster || {}),
+          ...cluster,
+        }
       })
 
       const noVClusters = mgmtClusters.filter((cluster: ClusterResource) => {
@@ -407,8 +479,8 @@ export default defineComponent({
 
       if (cluster.isReady) {
         return 'Ready';
-      } else if (cluster?.status && cluster.status.state) {
-        return cluster.status.state;
+      } else if (cluster?.state && cluster.state) {
+        return cluster.state.name!;
       } else {
         return 'Unknown';
       }
@@ -434,6 +506,12 @@ export default defineComponent({
 
   beforeUnmount() {
     document.body.classList.remove('vcluster-page-active');
+
+    // Clear polling interval
+    if (this.pollingInterval) {
+      window.clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
 
     const mainLayout = document.querySelector('.main-layout');
     if (mainLayout instanceof HTMLElement && this.originalStyles.has(mainLayout)) {

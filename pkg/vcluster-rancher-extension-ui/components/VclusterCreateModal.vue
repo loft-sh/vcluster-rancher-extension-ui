@@ -383,7 +383,7 @@ export default defineComponent({
                 <div class="option-content">
                   <span>{{ option.label }}</span>
                   <span v-if="option.disabled" class="text-muted"
-                    >(Not ready)</span
+                    >(No projects associated with this cluster)</span
                   >
                 </div>
               </template>

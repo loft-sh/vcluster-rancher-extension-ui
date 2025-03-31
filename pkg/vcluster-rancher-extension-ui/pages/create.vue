@@ -13,9 +13,10 @@ import LabeledSelect from '@shell/components/form/LabeledSelect.vue';
 import { mapGetters, Store } from 'vuex';
 import jsyaml from 'js-yaml';
 
-import { CATALOG, NAMESPACE } from '@shell/config/types';
+import { CATALOG, MANAGEMENT, NAMESPACE } from '@shell/config/types';
 import { LOFT_CHART_URL, PRODUCT_NAME } from '../constants';
 import { areUrlsEquivalent } from '../utils';
+import { PROJECT } from '@shell/config/labels-annotations';
 
 declare module 'vue/types/vue' {
   interface Vue {
@@ -182,7 +183,7 @@ rbac:
     },
 
     handleCreateVCluster(cb: AsyncButtonCallback) {
-      const clusterId = this.$route.params.cluster
+      const clusterId = this.$route.params.cluster as string
       const chartName = "vcluster"
       const version = this.$route.query.version
       const inStore = this.$store.getters['currentStore']();
@@ -204,9 +205,17 @@ rbac:
         const allNamespaceObjects = this.$store.getters[`${inStore}/all`](NAMESPACE);
         const namespaceObject = allNamespaceObjects.find((namespace: any) => namespace.id === this.value.metadata.namespace);
         projectId = namespaceObject?.metadata?.labels["field.cattle.io/projectId"];
+
+
+        if (!projectId) {
+          projectId = this.$store.getters['management/all'](MANAGEMENT.PROJECT).filter((p: {
+            id: string
+          }) => p.id.includes(clusterId))?.[0]?.id?.split('/')?.[1];
+        }
       }
 
       if (!projectId) {
+
         cb(false);
         this.$store.dispatch('growl/error', {
           title: 'Error',
