@@ -1,3 +1,5 @@
+import { ClusterResource } from "./pages/index.vue";
+
 export const getCookie = (name: string) => {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -39,4 +41,8 @@ function normalizeUrl(url: string): string {
 
 export function areUrlsEquivalent(url1: string, url2: string): boolean {
   return normalizeUrl(url1) === normalizeUrl(url2);
+}
+
+export function getClusterId(cluster: ClusterResource): string {
+  return cluster.id?.split("/").pop() || "";
 }

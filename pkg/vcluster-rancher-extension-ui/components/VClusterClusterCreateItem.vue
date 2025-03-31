@@ -80,29 +80,32 @@ export default {
         const inStore = this.$store.getters['currentStore']();
         const clusters = this.$store.getters[`${inStore}/all`]('management.cattle.io.cluster');
 
-        const readyClusters = clusters.filter((cluster: ClusterResource) => cluster.isReady);
-        const clustersWithProjects = readyClusters.filter((cluster: ClusterResource) =>
-          this.projects.some((project: ProjectResource) => project.spec.clusterName === cluster.id)
-        );
-        const readyClustersWithoutProjects = readyClusters.filter((cluster: ClusterResource) =>
-          !this.projects.some((project: ProjectResource) => project.spec.clusterName === cluster.id)
-        );
+        const mappedOptions = clusters.filter((cluster: ClusterResource) => cluster.isReady).map((cluster: ClusterResource) => {
+          const hasProjects = this.projects.some((project: ProjectResource) =>
+            project.spec?.clusterName === cluster.id
+          );
+
+          if (hasProjects) {
+            return {
+              label: cluster.nameDisplay,
+              value: cluster.id,
+            };
+          } else {
+            return {
+              label: cluster.nameDisplay,
+              value: cluster.id,
+              disabled: true,
+              tooltip: 'No projects available for this cluster'
+            };
+          }
+        });
 
         this.clusterOptions = [
           {
             label: '-- Select a Cluster --',
             value: '',
           },
-          ...clustersWithProjects.map((cluster: ClusterResource) => ({
-            label: cluster.nameDisplay,
-            value: cluster.id,
-          })),
-          ...readyClustersWithoutProjects.map((cluster: ClusterResource) => ({
-            label: cluster.nameDisplay,
-            value: cluster.id,
-            disabled: true,
-            tooltip: 'No projects available for this cluster'
-          }))
+          ...mappedOptions
         ] as { label: string, value: string, disabled?: boolean, tooltip?: string }[];
       } catch (error) {
         console.error('Error fetching clusters:', error);

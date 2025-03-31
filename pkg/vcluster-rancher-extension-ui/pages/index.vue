@@ -15,7 +15,7 @@ import BadgeState from '@shell/rancher-components/BadgeState/BadgeState.vue';
 import 'vue-router';
 import { LOFT_CHART_URL, RANCHER_CONSTANTS } from '../constants';
 import { allHash } from '@shell/utils/promise';
-import { areUrlsEquivalent } from '../utils';
+import { areUrlsEquivalent, getClusterId } from '../utils';
 
 
 declare module 'vue/types/vue' {
@@ -29,7 +29,9 @@ export interface ClusterResource {
   id: string;
   nameDisplay: string;
   isReady?: boolean;
-  state?: string;
+  state?: {
+    name?: string;
+  };
   mgmt?: boolean;
   metadata: {
     name: string;
@@ -129,7 +131,8 @@ export default defineComponent({
     combinedRows() {
       // Normalize cluster data
       const clusterRows = this.vClusters.map(cluster => {
-        const linkId = cluster.id.split('/').pop()
+        const linkId = getClusterId(cluster)
+
 
         return {
           id: linkId,
@@ -147,7 +150,8 @@ export default defineComponent({
             ...cluster.metadata
           },
           isReady: cluster.isReady,
-          state: cluster.metadata?.state?.message || "",
+          state: cluster.metadata?.state || "",
+          stateMessage: cluster.metadata?.state?.message || "",
           type: 'cluster',
           sort: cluster.isReady ? 1 : 2,
           group: 'active',
@@ -214,36 +218,34 @@ export default defineComponent({
 
 
     clusterOptions(): { label: string; value: string; disabled?: boolean; tooltip?: string }[] {
-      const mgmtClusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[];
+      const clusters = this.$store.getters['management/all'](MANAGEMENT.CLUSTER) as ClusterResource[];
 
-      // Separate ready clusters into those with and without projects
-      const readyClusters = mgmtClusters.filter(cluster => cluster.isReady);
-      const clustersWithProjects = readyClusters.filter(cluster =>
-        this.projects.some(project => project.spec.clusterName === cluster.id)
-      );
-      const readyClustersWithoutProjects = readyClusters.filter(cluster =>
-        !this.projects.some(project => project.spec.clusterName === cluster.id)
-      );
+      const mappedOptions = clusters.filter((cluster: ClusterResource) => cluster.isReady).map((cluster: ClusterResource) => {
+        const hasProjects = this.projects.some((project: ProjectResource) =>
+          project.spec?.clusterName === cluster.id
+        );
 
-      if (readyClusters.length === 0) {
-        return [];
-      }
+        if (hasProjects) {
+          return {
+            label: cluster.nameDisplay,
+            value: cluster.id,
+          };
+        } else {
+          return {
+            label: cluster.nameDisplay,
+            value: cluster.id,
+            disabled: true,
+            tooltip: 'No projects available for this cluster'
+          };
+        }
+      });
 
       return [
         {
           label: '-- Select a Cluster --',
           value: '',
         },
-        ...clustersWithProjects.map(cluster => ({
-          label: cluster.nameDisplay,
-          value: cluster.id,
-        })),
-        ...readyClustersWithoutProjects.map(cluster => ({
-          label: cluster.nameDisplay,
-          value: cluster.id,
-          disabled: true,
-          tooltip: 'No projects available for this cluster'
-        }))
+        ...mappedOptions
       ];
     }
   },
@@ -337,7 +339,7 @@ export default defineComponent({
               // make sure you don't include an app that has the same name as a cluster
               const isCluster = this.vClusters.some((c: ClusterResource) => {
                 const appId = `${cluster.id}-${app.metadata?.namespace}-${app.metadata?.name}`
-                const linkId = c?.id?.split('/').pop()
+                const linkId = getClusterId(c)
                 return appId === linkId
               });
               return !isCluster;
@@ -477,8 +479,8 @@ export default defineComponent({
 
       if (cluster.isReady) {
         return 'Ready';
-      } else if (cluster?.status && cluster.status.state) {
-        return cluster.status.state;
+      } else if (cluster?.state && cluster.state) {
+        return cluster.state.name!;
       } else {
         return 'Unknown';
       }
