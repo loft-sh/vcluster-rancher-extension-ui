@@ -1,8 +1,0 @@
-plugin/img/vclusterLogo.9b685fdd.svg
-plugin/package.json
-plugin/vcluster-rancher-extension-ui-0.1.0.umd.min.60.js
-plugin/vcluster-rancher-extension-ui-0.1.0.umd.min.60.js.map
-plugin/vcluster-rancher-extension-ui-0.1.0.umd.min.798.js
-plugin/vcluster-rancher-extension-ui-0.1.0.umd.min.798.js.map
-plugin/vcluster-rancher-extension-ui-0.1.0.umd.min.js
-plugin/vcluster-rancher-extension-ui-0.1.0.umd.min.js.map
