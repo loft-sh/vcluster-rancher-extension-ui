@@ -430,6 +430,11 @@ export default defineComponent({
         return {
           ...(mgmtCluster || {}),
           ...cluster,
+          spec: {
+            ...cluster.spec,
+            ...(mgmtCluster?.spec || {})
+          },
+          isReady: mgmtCluster?.isReady
         }
       })
 
