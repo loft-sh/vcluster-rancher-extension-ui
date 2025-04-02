@@ -1,7 +1,7 @@
 {
   "name": "vcluster-rancher-extension-ui",
   "description": "vCluster Rancher Extension UI",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": false,
   "icon": "https://www.vcluster.com/docs/media/rebranding/vCluster_horizontal-orange.svg",
   "rancher": {
