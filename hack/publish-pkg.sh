@@ -82,7 +82,7 @@ yarn run bump-$BUMP_TYPE
 yarn build-pkg vcluster-rancher-extension-ui
 
 # Publish the package
-yarn publish-pkgs vcluster-rancher-extension-ui
+yarn publish-pkgs -s loft-sh/vcluster-rancher-extension-ui 
 
 # Get version from package.json
 VERSION=$(node -p "require('./pkg/vcluster-rancher-extension-ui/package.json').version")
