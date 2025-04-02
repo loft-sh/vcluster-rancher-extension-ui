@@ -16,7 +16,7 @@ import jsyaml from 'js-yaml';
 import { CATALOG, MANAGEMENT, NAMESPACE } from '@shell/config/types';
 import { LOFT_CHART_URL, PRODUCT_NAME } from '../constants';
 import { areUrlsEquivalent } from '../utils';
-import { PROJECT } from '@shell/config/labels-annotations';
+
 
 declare module 'vue/types/vue' {
   interface Vue {
