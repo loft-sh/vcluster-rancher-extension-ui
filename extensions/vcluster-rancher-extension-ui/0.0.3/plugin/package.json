@@ -1,0 +1,20 @@
+{
+  "name": "vcluster-rancher-extension-ui",
+  "description": "vCluster Rancher Extension UI",
+  "version": "0.0.3",
+  "private": false,
+  "icon": "https://www.vcluster.com/docs/media/rebranding/vCluster_horizontal-orange.svg",
+  "rancher": true,
+  "engines": {
+    "node": ">=16"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-service": "~5.0.0",
+    "@vue/cli-plugin-typescript": "~5.0.0"
+  },
+  "files": [
+    "**/*"
+  ],
+  "main": "vcluster-rancher-extension-ui-0.0.3.umd.min.js"
+}
