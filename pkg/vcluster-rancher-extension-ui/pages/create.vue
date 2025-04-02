@@ -349,9 +349,7 @@ rbac:
     </div>
 
     <div class="vcluster-actions">
-      <button class="btn role-secondary" @click="goBack">
-        Back to Dashboard
-      </button>
+      <button class="btn role-secondary" @click="goBack">Cancel</button>
       <AsyncButton
         :disabled="!value.metadata.name || !value.metadata.namespace"
         :actionLabel="'Create vCluster'"
