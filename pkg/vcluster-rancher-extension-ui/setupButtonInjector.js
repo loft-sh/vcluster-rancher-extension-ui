@@ -23,7 +23,8 @@ export function setupButtonInjector() {
 
         copiedButton.addEventListener("click", (e) => {
           e.preventDefault();
-          window.location.href = "/vCluster/c/_/dashboard";
+          // This will break it locally, but works in prod. No way for me to determine if we're on a local env or prod.
+          window.location.href = "/dashboard/vCluster/c/_/dashboard";
         });
 
         const parent = button.parentElement;
