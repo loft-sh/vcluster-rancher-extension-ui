@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-extension-config
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  extension.json: |
+    {
+      "name": "vcluster-rancher-extension-ui",
+      "version": "{{ .Values.extension.version }}",
+      "description": "vCluster extension for Rancher UI",
+      "requirements": {
+        "rancher": ">={{ .Values.rancher.minVersion }}",
+        "uiExtension": ">={{ .Values.rancher.uiExtensionMinVersion }} <{{ .Values.rancher.uiExtensionMaxVersion }}"
+      }
+    }

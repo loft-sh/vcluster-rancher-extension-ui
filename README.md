@@ -43,8 +43,51 @@ API={RANCHER_API_URL} yarn dev
 
 ## Release process
 
-You need a username and password to chartmuseum to push the new version.
+### Automated release (CI)
+
+The extension is automatically built and published when a new GitHub release is created with a tag (e.g., `v0.1.0`). The CI workflow:
+
+1. Builds the extension package
+2. Updates the Helm chart version to match the release
+3. Commits the chart changes back to the repository
+4. Publishes the extension and chart to the Loft charts repository
+5. Sends a notification about the release
+
+### Manual release
+
+For manual releases, you need credentials for the chart repository:
 
 ```bash
+# Install dependencies first
+yarn install
+
+# Release with version bump
 hack/publish-pkg.sh --bump <major|minor|patch> --user <username> --password <password>
+```
+
+### Testing the release process
+
+You can test the release process without publishing anything:
+
+```bash
+# Dry run mode (builds locally but doesn't push anything)
+hack/publish-pkg.sh --bump <major|minor|patch> --dry-run
+```
+
+## Helm chart
+
+The extension is packaged as a Helm chart and published to the Loft charts repository. The chart:
+
+- Installs the vCluster Rancher Extension UI
+- Configures extension metadata for Rancher
+- Includes compatibility requirements
+
+The chart is maintained in the `charts/vcluster-rancher-extension-ui` directory in this repository.
+
+To use the chart directly:
+
+```bash
+helm repo add loft https://charts.loft.sh
+helm repo update
+helm install vcluster-rancher-extension-ui loft/vcluster-rancher-extension-ui
 ```
