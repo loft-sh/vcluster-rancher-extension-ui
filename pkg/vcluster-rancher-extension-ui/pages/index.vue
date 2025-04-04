@@ -133,7 +133,7 @@ export default defineComponent({
       const clusterRows = this.vClusters.map(cluster => {
         const linkId = getClusterId(cluster)
 
-
+        console.log(cluster)
         return {
           id: linkId,
           name: cluster.nameDisplay,
@@ -400,7 +400,7 @@ export default defineComponent({
       if (!cluster) {
         return 'bg-warning';
       }
-      if (cluster.isReady) {
+      if (cluster?.state && cluster.state.name === 'active') {
         return 'bg-success';
       } else if (cluster?.status && (cluster.status.state === 'Provisioning' || cluster.status.state === 'Updating' || cluster.status.state?.name === 'pending-install')) {
         return 'bg-info';
@@ -413,9 +413,26 @@ export default defineComponent({
       }
     },
 
+
+    getClusterStatusLabel(cluster: ClusterResource): string {
+      if (!cluster) {
+        return '';
+      }
+
+      if (cluster?.state && cluster.state) {
+        return cluster.state.name!;
+      } else {
+        return 'Unknown';
+      }
+    },
+
     async loadClusters(): Promise<void> {
       const mgmtClusters: ClusterResource[] = await this.$store.dispatch('management/findAll', { type: CAPI.RANCHER_CLUSTER })
       const mgmtClustersManagement = await this.$store.dispatch('management/findAll', { type: MANAGEMENT.CLUSTER }) || []
+
+
+      console.log({mgmtClusters})
+      console.log({mgmtClustersManagement})
 
 
       // we need to filter the ones that have : "loft.sh/vcluster-project-uid" and "loft.sh/vcluster-service-uid".
@@ -434,6 +451,7 @@ export default defineComponent({
             ...cluster.spec,
             ...(mgmtCluster?.spec || {})
           },
+          state: mgmtCluster?.state,
           isReady: mgmtCluster?.isReady
         }
       })
@@ -476,19 +494,6 @@ export default defineComponent({
       }
     },
 
-    getClusterStatusLabel(cluster: ClusterResource): string {
-      if (!cluster) {
-        return '';
-      }
-
-      if (cluster.isReady) {
-        return 'Ready';
-      } else if (cluster?.state && cluster.state) {
-        return cluster.state.name!;
-      } else {
-        return 'Unknown';
-      }
-    },
 
     openCreateDialog() {
       this.showCreateDialog = true;
