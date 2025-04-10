@@ -1,0 +1,13 @@
+# Default values for vcluster-rancher-extension-ui
+image:
+  repository: ghcr.io/loft-sh/vcluster-rancher-extension-ui
+  tag: latest
+  pullPolicy: IfNotPresent
+# UI extension version
+extension:
+  version: 0.0.3
+# Rancher configuration
+rancher:
+  minVersion: "2.10.0"
+  uiExtensionMinVersion: "3.0.0"
+  uiExtensionMaxVersion: "4.0.0"

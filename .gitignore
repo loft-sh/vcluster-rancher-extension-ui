@@ -135,7 +135,7 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-charts
 dist-pkg
 assets
 tmp
+*.tgz

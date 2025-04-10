@@ -1,0 +1,9 @@
+Thank you for installing the vCluster Rancher Extension UI chart!
+
+The extension is now available in your Rancher installation.
+
+Compatible with:
+- Rancher: v{{ .Values.rancher.minVersion }} or higher
+- UI Extension System: v{{ .Values.rancher.uiExtensionMinVersion }} up to v{{ .Values.rancher.uiExtensionMaxVersion }}
+
+You can access the vCluster UI extension through the Rancher dashboard.

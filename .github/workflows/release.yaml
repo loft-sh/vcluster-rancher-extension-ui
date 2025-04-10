@@ -1,0 +1,185 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-extension:
+    if: startsWith(github.ref, 'refs/tags/v') == true
+    name: Build vcluster-rancher-extension-ui
+    runs-on: ubuntu-latest
+
+    outputs:
+      release_version: ${{ steps.get_version.outputs.release_version }}
+      previous_tag: ${{ steps.get_version.outputs.previous_tag }}
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Fetch all tags
+        run: git fetch --force --tags
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          
+      - name: Install dependencies
+        run: yarn install
+      
+      - id: get_version
+        name: Get release version
+        run: |
+          RELEASE_VERSION=$(echo $GITHUB_REF | sed -nE 's!refs/tags/!!p')
+          echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous_tag=$(git describe --abbrev=0 --tags $(git rev-list --tags --skip=1 --max-count=1))" >> "$GITHUB_OUTPUT"
+      
+      - name: Update package version
+        run: |
+          # Extract version without 'v' prefix for tag
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Tag version: $TAG_VERSION"
+          
+          # This will always match the release tag
+          cd pkg/vcluster-rancher-extension-ui
+          npm version $TAG_VERSION --no-git-tag-version
+          echo "Updated package.json version to $TAG_VERSION"
+      
+      - name: Build and publish package
+        run: |
+          echo "Building package"
+          BUILD_SUCCESS=false
+          
+          if [ -f "./node_modules/@rancher/shell/scripts/build-pkg.sh" ]; then
+            # Use the shell script if available
+            yarn build-pkg vcluster-rancher-extension-ui && BUILD_SUCCESS=true
+          elif [ -d "pkg/vcluster-rancher-extension-ui" ]; then
+            # Directly run build command in the package directory
+            echo "Using direct build command"
+            (cd pkg/vcluster-rancher-extension-ui && yarn build) && BUILD_SUCCESS=true
+          else
+            echo "No build method available"
+          fi
+          
+          if [ "$BUILD_SUCCESS" = false ]; then
+            echo "Error: Build failed"
+            exit 1
+          fi
+          
+          # Publish the package
+          echo "Publishing package"
+          yarn publish-pkgs -s loft-sh/vcluster-rancher-extension-ui
+
+  publish-chart:
+    if: startsWith(github.ref, 'refs/tags/v') == true
+    needs: [build-extension]
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Helm
+        uses: helm/helm-gh-action@v4
+        with:
+          version: v3.14.2
+          
+      - name: Install YQ
+        run: |
+          wget https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 -O /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+          
+      - name: Update and Commit Helm Chart
+        run: |
+          RELEASE_VERSION=$(echo $GITHUB_REF | sed -nE 's!refs/tags/v!!p')
+          
+          # Need to use loft-bot wit admin permissions to push to main
+          git config --global user.name "loft-bot"
+          git config --global user.email "github@loft.sh"
+          
+          yq e -i ".version = \"${RELEASE_VERSION}\"" charts/vcluster-rancher-extension-ui/Chart.yaml
+          yq e -i ".appVersion = \"${RELEASE_VERSION}\"" charts/vcluster-rancher-extension-ui/Chart.yaml
+          yq e -i ".extension.version = \"${RELEASE_VERSION}\"" charts/vcluster-rancher-extension-ui/values.yaml
+          
+          # Commit changes back to the repository
+          git add charts/vcluster-rancher-extension-ui/
+          git commit -m "chore(chart): update chart version to ${RELEASE_VERSION}"
+          
+          # Use token for authentication
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/loft-sh/vcluster-rancher-extension-ui.git
+          git push --force-with-lease origin HEAD:main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Publish Helm chart
+        run: |
+          RELEASE_VERSION=$(echo $GITHUB_REF | sed -nE 's!refs/tags/v!!p')
+          
+          # Install Helm push plugin
+          helm plugin install https://github.com/chartmuseum/helm-push.git
+          
+          # Add the ChartMuseum repository
+          helm repo add chartmuseum https://charts.loft.sh --username ${{ secrets.CHART_MUSEUM_USER }} --password ${{ secrets.CHART_MUSEUM_PASSWORD }}
+          
+          # Validate the chart first
+          echo "Validating chart"
+          helm lint charts/vcluster-rancher-extension-ui/ || {
+            echo "Warning: Chart validation failed but continuing with release"
+          }
+          
+          # Package the chart with error handling
+          echo "Packaging chart"
+          helm package charts/vcluster-rancher-extension-ui/ || {
+            echo "Error: Helm packaging failed"
+            exit 1
+          }
+          
+          # Push the chart
+          echo "Pushing chart to repository"
+          helm cm-push --force vcluster-rancher-extension-ui-${RELEASE_VERSION}.tgz chartmuseum
+        env:
+          CHART_MUSEUM_USER: ${{ secrets.CHART_MUSEUM_USER }}
+          CHART_MUSEUM_PASSWORD: ${{ secrets.CHART_MUSEUM_PASSWORD }}
+
+  notify_release:
+    needs:
+      - build-extension
+      - publish-chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - id: get_base_branch
+        name: Get base branch for tag
+        run: |
+          RELEASE_VERSION=${{ needs.build-extension.outputs.release_version }}
+          TAG_COMMIT=$(git rev-list -n 1 "$RELEASE_VERSION")
+          BASE_BRANCH=$(git branch -r --contains "$TAG_COMMIT" | grep -v HEAD | sed -e 's/^[[:space:]]*//' -e 's/^origin\///' | head -n 1 || echo "main")
+          echo "base_branch=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Base branch for $RELEASE_VERSION: $BASE_BRANCH"
+          
+      - name: Notify #product-releases Slack channel
+        uses: loft-sh/github-actions/.github/actions/release-notification@v1
+        with:
+          version: ${{ needs.build-extension.outputs.release_version }}
+          previous_tag: ${{ needs.build-extension.outputs.previous_tag }}
+          changes: 'See changelog link below'
+          target_repo: 'loft-sh/vcluster-rancher-extension-ui'
+          product: 'vCluster Rancher Extension UI'
+          base_branch: ${{ steps.get_base_branch.outputs.base_branch }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL_PRODUCT_RELEASES }}

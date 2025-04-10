@@ -1,0 +1,7 @@
+apiVersion: v2
+name: vcluster-rancher-extension-ui
+description: A Helm chart for the vCluster Rancher Extension UI
+type: application
+# This version will be dynamically updated during the CI process with the git tag
+version: 0.0.3
+appVersion: 0.0.3
