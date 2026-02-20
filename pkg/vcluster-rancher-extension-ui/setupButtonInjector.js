@@ -1,3 +1,5 @@
+const vclusterLogoWhite = require('./assets/vclusterLogoWhite.svg');
+
 export function setupButtonInjector() {
   const addVClusterButton = () => {
     const button = document.querySelector(
@@ -12,19 +14,16 @@ export function setupButtonInjector() {
       const copiedButton = button.cloneNode(true);
 
       if (copiedButton) {
-        copiedButton.classList.add("btn", "btn-sm", "role-primary");
+        copiedButton.classList.add("btn", "btn-sm", "role-primary", "vcluster-create-btn", "vcluster-create-btn--home");
         copiedButton.setAttribute("data-testid", "vcluster-create-button");
-        copiedButton.setAttribute("href", "/vCluster/c/_/dashboard");
-        copiedButton.setAttribute(
-          "style",
-          "margin-left: 10px;background-color: rgb(255, 102, 0)",
-        );
-        copiedButton.textContent = "Create vCluster";
+        const base = window.location.pathname.startsWith("/dashboard") ? "/dashboard" : "";
+        copiedButton.setAttribute("href", `${base}/vCluster/c/_/dashboard`);
+        copiedButton.innerHTML = `<img src="${vclusterLogoWhite}" alt="" class="vcluster-btn-icon">Create vCluster`;
 
         copiedButton.addEventListener("click", (e) => {
           e.preventDefault();
-          // This will break it locally, but works in prod. No way for me to determine if we're on a local env or prod.
-          window.location.href = "/dashboard/vCluster/c/_/dashboard";
+          const base = window.location.pathname.startsWith("/dashboard") ? "/dashboard" : "";
+          window.location.href = `${base}/vCluster/c/_/dashboard`;
         });
 
         const parent = button.parentElement;
