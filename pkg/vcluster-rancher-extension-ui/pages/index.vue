@@ -561,11 +561,11 @@ export default defineComponent({
             <template #header-middle>
               <div class="table-heading">
                 <button
-                  class="btn btn-sm role-primary"
+                  class="btn btn-sm role-primary vcluster-create-btn"
                   @click="openCreateDialog"
                   data-testid="vcluster-create-button"
                 >
-                  Create vCluster
+                  <img src="../assets/vclusterLogoWhite.svg" alt="" class="vcluster-btn-icon" />Create vCluster
                 </button>
               </div>
             </template>
@@ -652,8 +652,25 @@ export default defineComponent({
 </template>
 
 <style lang="css">
+/* Keep the orange icon by default (img tag case) */
 .option img[src*="vclusterLogo"] {
   filter: none !important;
+}
+
+/* White icon on active/selected blue button (img tag case) */
+.btn-primary .option img[src*="vclusterLogo"],
+.option.selected img[src*="vclusterLogo"],
+.option.active img[src*="vclusterLogo"],
+.cluster-icon-menu-selected img[src*="vclusterLogo"] {
+  filter: brightness(0) invert(1) !important;
+}
+
+/* White icon on active/selected blue button (inline SVG case) */
+.btn-primary .option svg .st0,
+.option.selected svg .st0,
+.option.active svg .st0,
+.cluster-icon-menu-selected svg .st0 {
+  fill: #fff !important;
 }
 
 .bg-neutral {
@@ -742,6 +759,40 @@ export default defineComponent({
 
 .col-name {
   max-width: 280px;
+}
+
+.vcluster-btn-icon {
+  vertical-align: middle;
+  margin-right: 6px;
+  width: 16px;
+  height: 16px;
+}
+
+.vcluster-create-btn {
+  background-color: rgb(255, 102, 0);
+  border-color: rgb(255, 102, 0);
+
+  &:hover, &:focus {
+    background-color: rgb(220, 88, 0);
+    border-color: rgb(220, 88, 0);
+  }
+}
+
+.vcluster-create-btn--home {
+  margin-left: 10px;
+}
+
+/* vCluster nav icon: orange background + white logo when active or hovered */
+a.option[href*="/vCluster/"].router-link-active,
+a.option[href*="/vCluster/"].active-menu-link,
+a.option[href*="/vCluster/"]:hover {
+  background: rgb(255, 102, 0) !important;
+}
+
+a.option[href*="/vCluster/"].router-link-active img.svg-icon,
+a.option[href*="/vCluster/"].active-menu-link img.svg-icon,
+a.option[href*="/vCluster/"]:hover img.svg-icon {
+  filter: brightness(0) invert(1) !important;
 }
 
 .list-cluster-name {

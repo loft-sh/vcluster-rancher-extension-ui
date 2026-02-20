@@ -188,7 +188,7 @@ export default {
       <div class="provider-card item color2" @click="openVClusterModal">
         <div class="side-label"></div>
         <div class="provider-logo">
-          <img src="../assets/vclusterLogo.svg" alt="Amazon EKS" />
+          <img src="../assets/vclusterLogo.svg" alt="vCluster" />
         </div>
         <div class="provider-name">vCluster</div>
       </div>
