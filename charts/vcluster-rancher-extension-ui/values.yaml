@@ -5,7 +5,7 @@ image:
   pullPolicy: IfNotPresent
 # UI extension version
 extension:
-  version: 0.0.3
+  version: 0.0.4
 # Rancher configuration
 rancher:
   minVersion: "2.10.0"
