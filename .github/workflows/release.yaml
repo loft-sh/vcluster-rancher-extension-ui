@@ -93,6 +93,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -118,10 +119,10 @@ jobs:
           git add charts/vcluster-rancher-extension-ui/
           git commit -m "chore(chart): update chart version to ${RELEASE_VERSION}"
 
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/loft-sh/vcluster-rancher-extension-ui.git
+          git remote set-url origin https://x-access-token:${GH_ACCESS_TOKEN}@github.com/loft-sh/vcluster-rancher-extension-ui.git
           git push origin main
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
           
       - name: Publish Helm chart
         run: |
