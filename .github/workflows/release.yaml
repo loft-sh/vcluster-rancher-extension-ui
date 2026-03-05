@@ -88,9 +88,12 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout code
+      - name: Checkout main branch
         uses: actions/checkout@v4
-        
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Setup Helm
         uses: azure/setup-helm@v4
         with:
@@ -105,21 +108,18 @@ jobs:
         run: |
           RELEASE_VERSION=$(echo $GITHUB_REF | sed -nE 's!refs/tags/v!!p')
           
-          # Need to use loft-bot wit admin permissions to push to main
           git config --global user.name "loft-bot"
           git config --global user.email "github@loft.sh"
-          
+
           yq e -i ".version = \"${RELEASE_VERSION}\"" charts/vcluster-rancher-extension-ui/Chart.yaml
           yq e -i ".appVersion = \"${RELEASE_VERSION}\"" charts/vcluster-rancher-extension-ui/Chart.yaml
           yq e -i ".extension.version = \"${RELEASE_VERSION}\"" charts/vcluster-rancher-extension-ui/values.yaml
-          
-          # Commit changes back to the repository
+
           git add charts/vcluster-rancher-extension-ui/
           git commit -m "chore(chart): update chart version to ${RELEASE_VERSION}"
-          
-          # Use token for authentication
+
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/loft-sh/vcluster-rancher-extension-ui.git
-          git push --force-with-lease origin HEAD:main
+          git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
