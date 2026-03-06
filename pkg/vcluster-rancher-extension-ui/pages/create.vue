@@ -320,6 +320,7 @@ rbac:
       <NameNsDescription
         v-model:value="value"
         :description-hidden="true"
+        :no-default-namespace="true"
         mode="create"
         @isNamespaceNew="onNamespaceChange"
       />
